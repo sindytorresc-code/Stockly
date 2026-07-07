@@ -145,6 +145,18 @@ const businesses = [
 const defaultProducts = Object.fromEntries(businesses.map((business) => [business.id, business.products]));
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 
+function loadPins() {
+  try {
+    return JSON.parse(localStorage.getItem("inventory-pins-react")) || {};
+  } catch {
+    return {};
+  }
+}
+
+function savePins(pins) {
+  localStorage.setItem("inventory-pins-react", JSON.stringify(pins));
+}
+
 function loadProducts() {
   try {
     return JSON.parse(localStorage.getItem("inventory-products-react")) || defaultProducts;
@@ -167,6 +179,8 @@ export default function App() {
   const [filter, setFilter] = useState("all");
   const [editingProduct, setEditingProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pinsByBusiness, setPinsByBusiness] = useState(loadPins);
   const [toast, setToast] = useState("");
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0].theme;
@@ -209,7 +223,7 @@ export default function App() {
     const nextPin = key === "backspace" ? pin.slice(0, -1) : `${pin}${key}`.slice(0, 4);
     setPin(nextPin);
     if (nextPin.length === 4) {
-      if (nextPin === pinBusiness.pin) {
+      if (nextPin === getBusinessPin(pinBusiness, pinsByBusiness)) {
         setSelectedBusiness(pinBusiness);
         setPinBusiness(null);
         setPin("");
@@ -243,6 +257,34 @@ export default function App() {
   function openProductForm(product = null) {
     setEditingProduct(product);
     setDrawerOpen(true);
+  }
+
+  function changePassword(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const currentPin = String(form.get("currentPin") || "").trim();
+    const newPin = String(form.get("newPin") || "").trim();
+    const confirmPin = String(form.get("confirmPin") || "").trim();
+    const activePin = getBusinessPin(selectedBusiness, pinsByBusiness);
+
+    if (currentPin !== activePin) {
+      showToast("La clave actual no coincide");
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      showToast("La nueva clave debe tener 4 numeros");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      showToast("La confirmacion no coincide");
+      return;
+    }
+
+    const nextPins = { ...pinsByBusiness, [selectedBusiness.id]: newPin };
+    setPinsByBusiness(nextPins);
+    savePins(nextPins);
+    setPasswordModalOpen(false);
+    showToast("Clave actualizada");
   }
 
   function saveProduct(event) {
@@ -332,6 +374,7 @@ export default function App() {
           onEdit={openProductForm}
           onDelete={deleteProduct}
           onImport={importCsv}
+          onChangePassword={() => setPasswordModalOpen(true)}
         />
       )}
 
@@ -354,6 +397,13 @@ export default function App() {
             setEditingProduct(null);
           }}
           onSubmit={saveProduct}
+        />
+      )}
+
+      {passwordModalOpen && (
+        <PasswordModal
+          onClose={() => setPasswordModalOpen(false)}
+          onSubmit={changePassword}
         />
       )}
 
@@ -444,7 +494,7 @@ function PinModal({ business, pin, error, onClose, onKey }) {
   );
 }
 
-function InventoryDashboard({ business, theme, stats, query, filter, products, onBack, onQuery, onFilter, onAdd, onEdit, onDelete, onImport }) {
+function InventoryDashboard({ business, theme, stats, query, filter, products, onBack, onQuery, onFilter, onAdd, onEdit, onDelete, onImport, onChangePassword }) {
   const Icon = iconMap[business.icon];
   const filterOptions = [
     ["all", "Todos"],
@@ -475,6 +525,9 @@ function InventoryDashboard({ business, theme, stats, query, filter, products, o
                 <Upload size={18} /> Cargar archivo
                 <input type="file" accept=".csv" className="hidden" onChange={onImport} />
               </label>
+              <button type="button" onClick={onChangePassword} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">
+                Cambiar clave
+              </button>
               <button type="button" onClick={onAdd} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/20 px-4 font-bold">
                 <Plus size={18} /> Agregar Producto
               </button>
@@ -583,6 +636,30 @@ function ProductRow({ product, theme, onEdit, onDelete }) {
   );
 }
 
+function PasswordModal({ onClose, onSubmit }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 backdrop-blur-[1px]">
+      <form onSubmit={onSubmit} className="w-full max-w-sm rounded-lg bg-white p-6 text-neutral-950 shadow-2xl">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <h2 className="text-lg font-extrabold">Cambiar clave</h2>
+          <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-full text-neutral-600 hover:bg-neutral-100" aria-label="Cerrar cambio de clave">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="grid gap-4">
+          <ModalField label="Clave actual" name="currentPin" type="password" inputMode="numeric" maxLength="4" required autoFocus />
+          <ModalField label="Nueva clave" name="newPin" type="password" inputMode="numeric" maxLength="4" required />
+          <ModalField label="Confirmar nueva clave" name="confirmPin" type="password" inputMode="numeric" maxLength="4" required />
+        </div>
+        <p className="mt-4 text-xs font-semibold text-neutral-500">La clave debe tener 4 numeros. En esta version se guarda en este navegador.</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-neutral-300 bg-white px-5 text-sm font-extrabold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
+          <button type="submit" className="h-10 rounded-lg bg-pink-500 px-6 text-sm font-extrabold text-white hover:bg-pink-600">Guardar clave</button>
+        </div>
+      </form>
+    </div>
+  );
+}
 function ProductDrawer({ product, onClose, onSubmit }) {
   const title = product ? "Editar Producto" : "Agregar Producto";
 
@@ -644,6 +721,10 @@ function lowStockLimit(product) {
   return Number(product.minStock || 3);
 }
 
+function getBusinessPin(business, pinsByBusiness) {
+  return pinsByBusiness[business.id] || business.pin;
+}
+
 function tagClass(tag) {
   if (tag === "Agotado") return "bg-red-500/15 text-red-500";
   if (tag === "Reparacion") return "bg-orange-500/15 text-orange-500";
@@ -663,6 +744,7 @@ function matchesFilter(product, filter) {
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
 
 
 
