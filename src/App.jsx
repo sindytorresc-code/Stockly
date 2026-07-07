@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Delete,
@@ -178,7 +178,7 @@ export default function App() {
   const stats = useMemo(() => ({
     total: products.length,
     value: products.reduce((sum, product) => sum + product.price * product.stock, 0),
-    low: products.filter((product) => product.stock > 0 && product.stock <= 3).length,
+    low: products.filter((product) => product.stock > 0 && product.stock <= lowStockLimit(product)).length,
     empty: products.filter((product) => product.stock === 0).length,
   }), [products]);
 
@@ -252,9 +252,13 @@ export default function App() {
       name: String(form.get("name")).trim(),
       code: String(form.get("code")).trim(),
       category: String(form.get("category")).trim(),
+      brand: String(form.get("brand") || "").trim(),
       price: Number(form.get("price")),
+      purchasePrice: Number(form.get("purchasePrice") || 0),
       stock: Number(form.get("stock")),
-      tag: String(form.get("tag")),
+      minStock: Number(form.get("minStock") || 0),
+      image: String(form.get("image") || "").trim(),
+      tag: editingProduct?.tag || "En stock",
       comments: String(form.get("comments")).trim(),
     };
 
@@ -287,8 +291,20 @@ export default function App() {
     reader.onload = () => {
       const rows = String(reader.result).split(/\r?\n/).filter(Boolean);
       const imported = rows.slice(1).map((row) => {
-        const [name, code, category, price, stock, tag, comments] = row.split(",").map((item) => item?.trim());
-        return { name, code, category, price: Number(price), stock: Number(stock), tag: tag || "En stock", comments: comments || "" };
+        const [name, code, category, price, stock, tag, comments, minStock, purchasePrice, brand, image] = row.split(",").map((item) => item?.trim());
+        return {
+          name,
+          code,
+          category,
+          price: Number(price),
+          stock: Number(stock),
+          tag: tag || "En stock",
+          comments: comments || "",
+          minStock: Number(minStock || 0),
+          purchasePrice: Number(purchasePrice || 0),
+          brand: brand || "",
+          image: image || "",
+        };
       }).filter((item) => item.name && item.code && item.category);
       persist({ ...productsByBusiness, [selectedBusiness.id]: [...imported, ...products] });
       showToast(`${imported.length} productos cargados`);
@@ -550,7 +566,7 @@ function ProductRow({ product, theme, onEdit, onDelete }) {
       </td>
       <td className="px-4 py-3"><Pill className={theme.softAccent}>{product.category}</Pill></td>
       <td className="px-4 py-3 font-extrabold">{money.format(product.price)}</td>
-      <td className="px-4 py-3 font-extrabold">{product.stock} <StockPill stock={product.stock} /></td>
+      <td className="px-4 py-3 font-extrabold">{product.stock} <StockPill product={product} /></td>
       <td className="px-4 py-3"><Pill className={tagClass(product.tag)}>{product.tag}</Pill></td>
       <td className={`truncate px-4 py-3 text-sm font-semibold ${theme.muted}`} title={product.comments || ""}>{product.comments || "Sin comentarios"}</td>
       <td className="px-4 py-3">
@@ -567,63 +583,75 @@ function ProductRow({ product, theme, onEdit, onDelete }) {
   );
 }
 
-function ProductDrawer({ theme, product, onClose, onSubmit }) {
+function ProductDrawer({ product, onClose, onSubmit }) {
+  const title = product ? "Editar Producto" : "Agregar Producto";
+
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/60">
-      <form onSubmit={onSubmit} className={`h-full w-full max-w-md overflow-y-auto border-l p-6 shadow-soft ${theme.panel}`}>
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-extrabold">{product ? "Editar producto" : "Agregar producto"}</h2>
-          <button type="button" onClick={onClose} className={`grid size-9 place-items-center rounded-lg ${theme.panelSoft}`}>
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 px-4 py-6 backdrop-blur-[1px]">
+      <form onSubmit={onSubmit} className="w-full max-w-[512px] rounded-lg bg-white p-6 text-neutral-950 shadow-2xl">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <h2 className="text-lg font-extrabold">{title}</h2>
+          <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-full text-neutral-600 hover:bg-neutral-100" aria-label="Cerrar formulario">
             <X size={18} />
           </button>
         </div>
+
         <div className="grid gap-4">
-          <Field theme={theme} label="Nombre" name="name" defaultValue={product?.name} required />
-          <Field theme={theme} label="Codigo" name="code" defaultValue={product?.code} disabled={Boolean(product)} required />
-          <Field theme={theme} label="Categoria" name="category" defaultValue={product?.category} required />
-          <Field theme={theme} label="Precio" name="price" type="number" defaultValue={product?.price} required />
-          <Field theme={theme} label="Existencias" name="stock" type="number" defaultValue={product?.stock} required />
+          <ModalField label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-2" />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ModalField label="Categoria" name="category" defaultValue={product?.category} required />
+            <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} required />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required />
+            <ModalField label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required />
+            <ModalField label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ModalField label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} />
+            <ModalField label="Marca" name="brand" defaultValue={product?.brand || ""} />
+          </div>
+
+          <ModalField label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." />
+
           <label className="grid gap-2">
-            <span className={`text-xs font-extrabold ${theme.muted}`}>Estado interno</span>
-            <select name="tag" defaultValue={product?.tag || "En stock"} className={`h-11 rounded-lg border px-3 outline-none ${theme.input}`}>
-              <option>En stock</option>
-              <option>Asignado</option>
-              <option>Campana</option>
-              <option>Reparacion</option>
-              <option>Agotado</option>
-            </select>
-          </label>
-          <label className="grid gap-2">
-            <span className={`text-xs font-extrabold ${theme.muted}`}>Comentarios</span>
-            <textarea name="comments" defaultValue={product?.comments || ""} className={`min-h-24 resize-y rounded-lg border px-3 py-3 outline-none ${theme.input}`} placeholder="Ej: reservado, pendiente de garantia, proveedor..." />
+            <span className="text-sm font-bold text-neutral-600">Descripcion</span>
+            <textarea name="comments" defaultValue={product?.comments || ""} className="min-h-[62px] resize-y rounded-lg border border-pink-300 px-3 py-3 text-sm text-neutral-900 outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
           </label>
         </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className={`h-11 rounded-lg border px-5 font-extrabold ${theme.panelSoft}`}>Cancelar</button>
-          <button type="submit" className={`h-11 rounded-lg px-5 font-extrabold ${theme.accent}`}>Guardar</button>
+
+        <div className="mt-8 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-neutral-300 bg-white px-5 text-sm font-extrabold text-neutral-600 hover:bg-neutral-50">Cancelar</button>
+          <button type="submit" className="h-10 rounded-lg bg-pink-500 px-7 text-sm font-extrabold text-white hover:bg-pink-600">{product ? "Guardar Cambios" : "Guardar Producto"}</button>
         </div>
       </form>
     </div>
   );
 }
 
-function Field({ theme, label, ...props }) {
+function ModalField({ label, className = "", ...props }) {
   return (
-    <label className="grid gap-2">
-      <span className={`text-xs font-extrabold ${theme.muted}`}>{label}</span>
-      <input {...props} className={`h-11 rounded-lg border px-3 outline-none ${theme.input}`} />
+    <label className={`grid gap-2 ${className}`}>
+      <span className="text-sm font-bold text-neutral-600">{label}</span>
+      <input {...props} className="h-[43px] rounded-lg border border-pink-300 px-3 text-sm text-neutral-900 outline-none transition placeholder:text-slate-400 focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
     </label>
   );
 }
-
 function Pill({ children, className }) {
   return <span className={`inline-flex min-h-6 items-center rounded-full px-3 text-xs font-extrabold ${className}`}>{children}</span>;
 }
 
-function StockPill({ stock }) {
-  if (stock === 0) return <Pill className="bg-red-500/15 text-red-500">Agotado</Pill>;
-  if (stock <= 3) return <Pill className="bg-amber-500/15 text-amber-500">Stock bajo</Pill>;
+function StockPill({ product }) {
+  if (product.stock === 0) return <Pill className="bg-red-500/15 text-red-500">Agotado</Pill>;
+  if (product.stock <= lowStockLimit(product)) return <Pill className="bg-amber-500/15 text-amber-500">Stock bajo</Pill>;
   return <Pill className="bg-emerald-500/15 text-emerald-500">En stock</Pill>;
+}
+
+function lowStockLimit(product) {
+  return Number(product.minStock || 3);
 }
 
 function tagClass(tag) {
@@ -641,7 +669,8 @@ function matchesSearch(product, query) {
 
 function matchesFilter(product, filter) {
   if (filter === "stock") return product.stock > 3;
-  if (filter === "low") return product.stock > 0 && product.stock <= 3;
+  if (filter === "low") return product.stock > 0 && product.stock <= lowStockLimit(product);
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
