@@ -596,28 +596,18 @@ function ProductDrawer({ product, onClose, onSubmit }) {
           </button>
         </div>
 
-        <div className="grid gap-4">
-          <ModalField label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-2" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+          <ModalField label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-6" />
+          <ModalField label="Categoria" name="category" defaultValue={product?.category} required className="sm:col-span-3" />
+          <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} required className="sm:col-span-3" />
+          <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
+          <ModalField label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required className="sm:col-span-2" />
+          <ModalField label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} className="sm:col-span-2" />
+          <ModalField label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} className="sm:col-span-3" />
+          <ModalField label="Marca" name="brand" defaultValue={product?.brand || ""} className="sm:col-span-3" />
+          <ModalField label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." className="sm:col-span-6" />
 
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-            <ModalField label="Categoria" name="category" defaultValue={product?.category} required />
-            <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} required />
-          </div>
-
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
-            <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required />
-            <ModalField label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required />
-            <ModalField label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} />
-          </div>
-
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-            <ModalField label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} />
-            <ModalField label="Marca" name="brand" defaultValue={product?.brand || ""} />
-          </div>
-
-          <ModalField label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." />
-
-          <label className="grid gap-2">
+          <label className="grid min-w-0 gap-2 sm:col-span-6">
             <span className="text-sm font-bold text-neutral-600">Descripcion</span>
             <textarea name="comments" defaultValue={product?.comments || ""} className="min-h-[62px] w-full min-w-0 resize-y rounded-lg border border-pink-300 px-3 py-3 text-sm text-neutral-900 outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
           </label>
@@ -673,5 +663,6 @@ function matchesFilter(product, filter) {
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
 
 
