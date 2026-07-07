@@ -588,7 +588,7 @@ function ProductDrawer({ product, onClose, onSubmit }) {
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 px-4 py-6 backdrop-blur-[1px]">
-      <form onSubmit={onSubmit} className="w-full max-w-[512px] rounded-lg bg-white p-6 text-neutral-950 shadow-2xl">
+      <form onSubmit={onSubmit} className="max-h-[92vh] w-full max-w-[512px] overflow-y-auto overflow-x-hidden rounded-lg bg-white p-6 text-neutral-950 shadow-2xl">
         <div className="mb-6 flex items-start justify-between gap-4">
           <h2 className="text-lg font-extrabold">{title}</h2>
           <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-full text-neutral-600 hover:bg-neutral-100" aria-label="Cerrar formulario">
@@ -599,18 +599,18 @@ function ProductDrawer({ product, onClose, onSubmit }) {
         <div className="grid gap-4">
           <ModalField label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-2" />
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <ModalField label="Categoria" name="category" defaultValue={product?.category} required />
             <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} required />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
             <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required />
             <ModalField label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required />
             <ModalField label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
             <ModalField label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} />
             <ModalField label="Marca" name="brand" defaultValue={product?.brand || ""} />
           </div>
@@ -619,7 +619,7 @@ function ProductDrawer({ product, onClose, onSubmit }) {
 
           <label className="grid gap-2">
             <span className="text-sm font-bold text-neutral-600">Descripcion</span>
-            <textarea name="comments" defaultValue={product?.comments || ""} className="min-h-[62px] resize-y rounded-lg border border-pink-300 px-3 py-3 text-sm text-neutral-900 outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
+            <textarea name="comments" defaultValue={product?.comments || ""} className="min-h-[62px] w-full min-w-0 resize-y rounded-lg border border-pink-300 px-3 py-3 text-sm text-neutral-900 outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
           </label>
         </div>
 
@@ -634,9 +634,9 @@ function ProductDrawer({ product, onClose, onSubmit }) {
 
 function ModalField({ label, className = "", ...props }) {
   return (
-    <label className={`grid gap-2 ${className}`}>
+    <label className={`grid min-w-0 gap-2 ${className}`}>
       <span className="text-sm font-bold text-neutral-600">{label}</span>
-      <input {...props} className="h-[43px] rounded-lg border border-pink-300 px-3 text-sm text-neutral-900 outline-none transition placeholder:text-slate-400 focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
+      <input {...props} className="h-[43px] w-full min-w-0 rounded-lg border border-pink-300 px-3 text-sm text-neutral-900 outline-none transition placeholder:text-slate-400 focus:border-pink-500 focus:ring-2 focus:ring-pink-200" />
     </label>
   );
 }
@@ -673,4 +673,5 @@ function matchesFilter(product, filter) {
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
 
