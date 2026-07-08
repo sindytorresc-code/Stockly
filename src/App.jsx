@@ -144,6 +144,74 @@ const businesses = [
 
 const defaultProducts = Object.fromEntries(businesses.map((business) => [business.id, business.products]));
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const hasSupabaseConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+async function supabaseRequest(path, options = {}) {
+  if (!hasSupabaseConfig) throw new Error("Supabase no esta configurado");
+  const response = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(details || response.statusText);
+  }
+
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function fetchSupabaseClient(slug) {
+  const rows = await supabaseRequest(`/clients?slug=eq.${encodeURIComponent(slug)}&select=id,slug`);
+  return rows?.[0] || null;
+}
+
+async function fetchSupabaseProducts(clientId) {
+  return supabaseRequest(`/products?client_id=eq.${clientId}&select=*&order=created_at.desc`);
+}
+
+function dbProductToApp(row) {
+  return {
+    dbId: row.id,
+    name: row.name,
+    code: row.code,
+    category: row.category,
+    price: Number(row.price || 0),
+    purchasePrice: Number(row.purchase_price || 0),
+    stock: Number(row.stock || 0),
+    minStock: Number(row.min_stock || 3),
+    tag: row.status || "En stock",
+    brand: row.brand || "",
+    comments: row.comments || "",
+    image: row.image_url || "",
+  };
+}
+
+function appProductToDb(product, clientId) {
+  return {
+    client_id: clientId,
+    name: product.name,
+    code: product.code,
+    category: product.category,
+    price: Number(product.price || 0),
+    purchase_price: Number(product.purchasePrice || 0),
+    stock: Number(product.stock || 0),
+    min_stock: Number(product.minStock || 3),
+    status: product.tag || "En stock",
+    brand: product.brand || "",
+    comments: product.comments || "",
+    image_url: product.image || null,
+  };
+}
 
 function loadPins() {
   try {
@@ -181,6 +249,9 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [pinsByBusiness, setPinsByBusiness] = useState(loadPins);
+  const [clientIdsByBusiness, setClientIdsByBusiness] = useState({});
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [dataSource, setDataSource] = useState(hasSupabaseConfig ? "Supabase" : "Local");
   const [toast, setToast] = useState("");
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0].theme;
@@ -199,6 +270,49 @@ export default function App() {
   function persist(nextProducts) {
     setProductsByBusiness(nextProducts);
     saveProducts(nextProducts);
+  }
+
+  function setBusinessProducts(businessId, nextProducts) {
+    setProductsByBusiness((current) => {
+      const next = { ...current, [businessId]: nextProducts };
+      saveProducts(next);
+      return next;
+    });
+  }
+
+  async function getClientIdForBusiness(business) {
+    if (clientIdsByBusiness[business.id]) return clientIdsByBusiness[business.id];
+    const client = await fetchSupabaseClient(business.id);
+    if (!client) throw new Error(`No existe el cliente ${business.id} en Supabase`);
+    setClientIdsByBusiness((current) => ({ ...current, [business.id]: client.id }));
+    return client.id;
+  }
+
+  async function loadSupabaseInventory(business) {
+    if (!hasSupabaseConfig) return;
+    setIsLoadingProducts(true);
+    try {
+      const clientId = await getClientIdForBusiness(business);
+      let rows = await fetchSupabaseProducts(clientId);
+
+      if (!rows.length) {
+        await supabaseRequest("/products?on_conflict=client_id,code", {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+          body: JSON.stringify(business.products.map((product) => appProductToDb(product, clientId))),
+        });
+        rows = await fetchSupabaseProducts(clientId);
+      }
+
+      setBusinessProducts(business.id, rows.map(dbProductToApp));
+      setDataSource("Supabase");
+    } catch (error) {
+      console.error(error);
+      setDataSource("Local");
+      showToast("No pude conectar Supabase; usando datos locales");
+    } finally {
+      setIsLoadingProducts(false);
+    }
   }
 
   function showToast(message) {
@@ -235,6 +349,10 @@ export default function App() {
       }
     }
   }
+
+  useEffect(() => {
+    if (selectedBusiness) loadSupabaseInventory(selectedBusiness);
+  }, [selectedBusiness?.id]);
 
   useEffect(() => {
     if (!pinBusiness) return undefined;
@@ -287,7 +405,7 @@ export default function App() {
     showToast("Clave actualizada");
   }
 
-  function saveProduct(event) {
+  async function saveProduct(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const product = {
@@ -311,9 +429,28 @@ export default function App() {
       return;
     }
 
+    let savedProduct = { ...product, dbId: editingProduct?.dbId };
+
+    if (hasSupabaseConfig) {
+      try {
+        const clientId = await getClientIdForBusiness(selectedBusiness);
+        const rows = await supabaseRequest("/products?on_conflict=client_id,code", {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+          body: JSON.stringify(appProductToDb(product, clientId)),
+        });
+        if (rows?.[0]) savedProduct = dbProductToApp(rows[0]);
+        setDataSource("Supabase");
+      } catch (error) {
+        console.error(error);
+        setDataSource("Local");
+        showToast("No pude guardar en Supabase; guardado local");
+      }
+    }
+
     const nextProducts = editingProduct
-      ? products.map((item) => item.code === editingProduct.code ? product : item)
-      : [product, ...products];
+      ? products.map((item) => item.code === editingProduct.code ? savedProduct : item)
+      : [savedProduct, ...products];
 
     persist({ ...productsByBusiness, [selectedBusiness.id]: nextProducts });
     setDrawerOpen(false);
@@ -321,8 +458,23 @@ export default function App() {
     showToast("Inventario actualizado");
   }
 
-  function deleteProduct(code) {
-    persist({ ...productsByBusiness, [selectedBusiness.id]: products.filter((product) => product.code !== code) });
+  async function deleteProduct(code) {
+    const product = products.find((item) => item.code === code);
+
+    if (hasSupabaseConfig && product) {
+      try {
+        const clientId = await getClientIdForBusiness(selectedBusiness);
+        const filter = product.dbId ? `id=eq.${product.dbId}` : `client_id=eq.${clientId}&code=eq.${encodeURIComponent(code)}`;
+        await supabaseRequest(`/products?${filter}`, { method: "DELETE" });
+        setDataSource("Supabase");
+      } catch (error) {
+        console.error(error);
+        setDataSource("Local");
+        showToast("No pude borrar en Supabase; borrado local");
+      }
+    }
+
+    persist({ ...productsByBusiness, [selectedBusiness.id]: products.filter((item) => item.code !== code) });
     showToast("Producto eliminado");
   }
 
@@ -330,7 +482,7 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const rows = String(reader.result).split(/\r?\n/).filter(Boolean);
       const imported = rows.slice(1).map((row) => {
         const [name, code, category, price, stock, tag, comments, minStock, purchasePrice, brand, image] = row.split(",").map((item) => item?.trim());
@@ -348,7 +500,26 @@ export default function App() {
           image: image || "",
         };
       }).filter((item) => item.name && item.code && item.category);
-      persist({ ...productsByBusiness, [selectedBusiness.id]: [...imported, ...products] });
+      let importedProducts = imported;
+
+      if (hasSupabaseConfig && imported.length) {
+        try {
+          const clientId = await getClientIdForBusiness(selectedBusiness);
+          const rows = await supabaseRequest("/products?on_conflict=client_id,code", {
+            method: "POST",
+            headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+            body: JSON.stringify(imported.map((product) => appProductToDb(product, clientId))),
+          });
+          importedProducts = rows?.map(dbProductToApp) || imported;
+          setDataSource("Supabase");
+        } catch (error) {
+          console.error(error);
+          setDataSource("Local");
+          showToast("No pude importar en Supabase; importado local");
+        }
+      }
+
+      persist({ ...productsByBusiness, [selectedBusiness.id]: [...importedProducts, ...products] });
       showToast(`${imported.length} productos cargados`);
       event.target.value = "";
     };
@@ -367,6 +538,8 @@ export default function App() {
           query={query}
           filter={filter}
           products={visibleProducts}
+          isLoadingProducts={isLoadingProducts}
+          dataSource={dataSource}
           onBack={() => setSelectedBusiness(null)}
           onQuery={setQuery}
           onFilter={setFilter}
@@ -494,7 +667,7 @@ function PinModal({ business, pin, error, onClose, onKey }) {
   );
 }
 
-function InventoryDashboard({ business, theme, stats, query, filter, products, onBack, onQuery, onFilter, onAdd, onEdit, onDelete, onImport, onChangePassword }) {
+function InventoryDashboard({ business, theme, stats, query, filter, products, isLoadingProducts, dataSource, onBack, onQuery, onFilter, onAdd, onEdit, onDelete, onImport, onChangePassword }) {
   const Icon = iconMap[business.icon];
   const filterOptions = [
     ["all", "Todos"],
@@ -543,6 +716,8 @@ function InventoryDashboard({ business, theme, stats, query, filter, products, o
           <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
           <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
         </section>
+
+        <div className={`mt-5 inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${theme.panelSoft}`}>Datos: {dataSource}{isLoadingProducts ? " sincronizando..." : ""}</div>
 
         <section className="my-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <label className={`flex h-11 w-full max-w-xl items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
@@ -676,7 +851,7 @@ function ProductDrawer({ product, onClose, onSubmit }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <ModalField label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-6" />
           <ModalField label="Categoria" name="category" defaultValue={product?.category} required className="sm:col-span-3" />
-          <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} required className="sm:col-span-3" />
+          <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} disabled={Boolean(product)} required className="sm:col-span-3" />
           <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
           <ModalField label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required className="sm:col-span-2" />
           <ModalField label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} className="sm:col-span-2" />
@@ -744,6 +919,8 @@ function matchesFilter(product, filter) {
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
+
 
 
 

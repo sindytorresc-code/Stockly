@@ -1,38 +1,46 @@
 ﻿# Base de datos
 
-La app actual guarda datos en `localStorage`, que sirve para una demo local. Para un sistema real necesitas una base de datos fuera del navegador.
+La app usa Supabase cuando las variables de entorno estan configuradas. Si Supabase no responde o las tablas no existen, Stockly usa `localStorage` como respaldo temporal.
 
-## Recomendacion
+## Proyecto configurado
 
-Usa **Supabase** si quieres avanzar rapido:
-
-- Es PostgreSQL.
-- Tiene panel web para ver tablas.
-- Tiene API automatica.
-- Funciona bien con React/Vite.
-- Puedes manejar login y permisos despues.
-
-## Donde se hace
-
-1. Entra a Supabase y crea un proyecto.
-2. Abre `SQL Editor`.
-3. Copia y ejecuta el archivo `database/schema.sql`.
-4. Crea un archivo `.env` en este proyecto con tus claves:
+URL del proyecto:
 
 ```bash
-VITE_SUPABASE_URL=tu_url_de_supabase
-VITE_SUPABASE_ANON_KEY=tu_anon_key
+VITE_SUPABASE_URL=https://ashgqegyqnfwjytdsrzn.supabase.co
 ```
 
-## Alternativas
+La `anon public key` debe ir en `.env` como:
 
-- **Firebase**: buena opcion si quieres algo simple y en tiempo real, pero no es SQL.
-- **MySQL/PostgreSQL propio**: mejor si ya tienes hosting/backend, pero requiere crear API.
-- **LocalStorage**: solo para pruebas, no para produccion.
+```bash
+VITE_SUPABASE_ANON_KEY=tu_anon_public_key
+```
 
-## Tablas sugeridas
+## Paso obligatorio
 
-- `clients`: negocios/clientes, tema visual y datos generales.
-- `products`: inventario de cada cliente, incluyendo precio, stock, estado y comentarios.
+Antes de que la web guarde productos en Supabase debes ejecutar el SQL:
 
-El archivo `database/schema.sql` ya trae esa estructura.
+1. Entra a Supabase.
+2. Abre `SQL Editor`.
+3. Copia todo el contenido de `database/schema.sql`.
+4. Ejecutalo.
+
+Ese archivo crea:
+
+- `clients`
+- `products`
+- columnas extra como `brand`, `purchase_price` y `min_stock`
+- clientes iniciales: `atain`, `sabor`, `vogue`, `mara`
+
+## Como funciona ahora
+
+- Al entrar a un cliente, Stockly busca sus productos en Supabase.
+- Si no hay productos, siembra los productos de ejemplo.
+- Agregar, editar, eliminar e importar CSV intentan guardar en Supabase.
+- Si Supabase falla, se usa `localStorage` como respaldo.
+
+## Seguridad
+
+La `anon public key` puede vivir en frontend. La `service_role key` nunca debe ponerse en la app.
+
+Para produccion real con contrasenas seguras, lo ideal es migrar el PIN a Supabase Auth o una Edge Function que valide hashes del lado servidor.

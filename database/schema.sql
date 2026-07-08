@@ -20,14 +20,21 @@ create table if not exists products (
   code text not null,
   category text not null,
   price numeric(12, 2) not null default 0,
+  purchase_price numeric(12, 2) not null default 0,
   stock integer not null default 0,
+  min_stock integer not null default 3,
   status text not null default 'En stock',
+  brand text not null default '',
   comments text not null default '',
   image_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (client_id, code)
 );
+
+alter table products add column if not exists purchase_price numeric(12, 2) not null default 0;
+alter table products add column if not exists min_stock integer not null default 3;
+alter table products add column if not exists brand text not null default '';
 
 create index if not exists products_client_id_idx on products(client_id);
 create index if not exists products_category_idx on products(category);
