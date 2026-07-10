@@ -18,19 +18,21 @@ VITE_SUPABASE_ANON_KEY=tu_anon_public_key
 
 ## Paso obligatorio
 
-Antes de que la web guarde productos en Supabase debes ejecutar el SQL:
+Antes de que la web guarde productos en Supabase debes ejecutar SQL en Supabase:
 
 1. Entra a Supabase.
 2. Abre `SQL Editor`.
-3. Copia todo el contenido de `database/schema.sql`.
-4. Ejecutalo.
+3. Copia y ejecuta todo el contenido de `database/schema.sql`.
+4. Copia y ejecuta todo el contenido de `database/public-demo-policies.sql`.
 
-Ese archivo crea:
+`schema.sql` crea:
 
 - `clients`
 - `products`
 - columnas extra como `brand`, `purchase_price` y `min_stock`
 - clientes iniciales: `atain`, `sabor`, `vogue`, `mara`
+
+`public-demo-policies.sql` crea politicas RLS para que la app publicada pueda leer, crear, editar y borrar usando la `anon public key`.
 
 ## Como funciona ahora
 
@@ -43,4 +45,4 @@ Ese archivo crea:
 
 La `anon public key` puede vivir en frontend. La `service_role key` nunca debe ponerse en la app.
 
-Para produccion real con contrasenas seguras, lo ideal es migrar el PIN a Supabase Auth o una Edge Function que valide hashes del lado servidor.
+`public-demo-policies.sql` esta pensado para demo publica. Para produccion real, lo ideal es migrar el PIN a Supabase Auth o una Edge Function que valide hashes del lado servidor, y usar politicas por usuario/cliente.
