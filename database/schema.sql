@@ -25,6 +25,8 @@ create table if not exists products (
   min_stock integer not null default 3,
   status text not null default 'En stock',
   brand text not null default '',
+  spot text not null default '',
+  campaign text not null default '',
   comments text not null default '',
   image_url text,
   created_at timestamptz not null default now(),
@@ -35,10 +37,13 @@ create table if not exists products (
 alter table products add column if not exists purchase_price numeric(12, 2) not null default 0;
 alter table products add column if not exists min_stock integer not null default 3;
 alter table products add column if not exists brand text not null default '';
+alter table products add column if not exists spot text not null default '';
+alter table products add column if not exists campaign text not null default '';
 
 create index if not exists products_client_id_idx on products(client_id);
 create index if not exists products_category_idx on products(category);
 create index if not exists products_status_idx on products(status);
+create index if not exists products_campaign_idx on products(campaign);
 
 -- Datos iniciales de clientes. Para PIN real, guarda un hash, no el PIN plano.
 insert into clients (slug, name, business_type, description, icon, theme)
@@ -48,3 +53,4 @@ values
   ('vogue', 'Estilo Vogue', 'MODA', 'Ropa de disenador y accesorios de autor', 'shirt', '{"mode":"light","accent":"gold"}'),
   ('mara', 'Maquillaje de Mara', 'REVESTIR', 'Tienda de cosmeticos y productos de cuidado', 'sparkles', '{"mode":"light","accent":"pink"}')
 on conflict (slug) do nothing;
+

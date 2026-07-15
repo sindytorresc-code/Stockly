@@ -145,6 +145,31 @@ const businesses = [
 
 const defaultProducts = Object.fromEntries(businesses.map((business) => [business.id, business.products]));
 const money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const atainCampaigns = [
+  "PRICELINE1",
+  "PRICELINE2",
+  "AMERICAN",
+  "BLUELINK",
+  "DUFFEL",
+  "ITA",
+  "MASSON",
+  "TRN1",
+  "TRN2",
+  "TRN3",
+  "HERZT",
+  "ADOREME",
+  "TRN MANILLA",
+  "TRN DEHLI",
+  "TRN DIFFEL",
+  "TRN MONACO",
+  "UNITED 1",
+  "UNITED 2",
+  "AIRCANADA",
+  "SIXT",
+  "TRN GUATAVITA",
+  "TRN SANTA MARTA",
+  "TRN BOLIVAR",
+];
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const hasSupabaseConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
@@ -192,6 +217,8 @@ function dbProductToApp(row) {
     minStock: Number(row.min_stock || 3),
     tag: row.status || "En stock",
     brand: row.brand || "",
+    spot: row.spot || "",
+    campaign: row.campaign || "",
     comments: row.comments || "",
     image: row.image_url || "",
   };
@@ -209,6 +236,8 @@ function appProductToDb(product, clientId) {
     min_stock: Number(product.minStock || 3),
     status: product.tag || "En stock",
     brand: product.brand || "",
+    spot: product.spot || "",
+    campaign: product.campaign || "",
     comments: product.comments || "",
     image_url: product.image || null,
   };
@@ -416,6 +445,8 @@ export default function App() {
       brand: String(form.get("brand") || "").trim(),
       price: Number(form.get("price")),
       purchasePrice: Number(form.get("purchasePrice") || 0),
+      spot: String(form.get("spot") || "").trim(),
+      campaign: String(form.get("campaign") || "").trim(),
       stock: Number(form.get("stock")),
       minStock: Number(form.get("minStock") || 0),
       image: String(form.get("image") || "").trim(),
@@ -486,7 +517,7 @@ export default function App() {
     reader.onload = async () => {
       const rows = String(reader.result).split(/\r?\n/).filter(Boolean);
       const imported = rows.slice(1).map((row) => {
-        const [name, code, category, price, stock, tag, comments, minStock, purchasePrice, brand, image] = row.split(",").map((item) => item?.trim());
+        const [name, code, category, price, stock, tag, comments, minStock, purchasePrice, brand, image, spot, campaign] = row.split(",").map((item) => item?.trim());
         return {
           name,
           code,
@@ -499,6 +530,8 @@ export default function App() {
           purchasePrice: Number(purchasePrice || 0),
           brand: brand || "",
           image: image || "",
+          spot: spot || "",
+          campaign: campaign || "",
         };
       }).filter((item) => item.name && item.code && item.category);
       let importedProducts = imported;
@@ -564,6 +597,7 @@ export default function App() {
 
       {drawerOpen && (
         <ProductDrawer
+          business={selectedBusiness}
           theme={theme}
           product={editingProduct}
           onClose={() => {
@@ -671,6 +705,7 @@ function PinModal({ business, pin, error, onClose, onKey }) {
 function InventoryDashboard({ business, theme, stats, query, filter, products, isLoadingProducts, dataSource, onBack, onQuery, onFilter, onAdd, onEdit, onDelete, onImport, onChangePassword }) {
   const Icon = iconMap[business.icon];
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
+  const isAtain = business.id === "atain";
   const filterOptions = [
     ["all", "Todos"],
     ["stock", "En stock"],
@@ -729,7 +764,7 @@ function InventoryDashboard({ business, theme, stats, query, filter, products, i
         <section className="my-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <label className={`flex h-11 w-full max-w-xl items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
             <Search size={18} />
-            <input value={query} onChange={(event) => onQuery(event.target.value)} className="w-full bg-transparent outline-none" placeholder="Buscar producto, categoria, codigo o comentario..." />
+            <input value={query} onChange={(event) => onQuery(event.target.value)} className="w-full bg-transparent outline-none" placeholder="Buscar producto, categoria, codigo, campana o comentario..." />
           </label>
           <div className="flex gap-2 overflow-x-auto">
             {filterOptions.map(([value, label]) => (
@@ -742,21 +777,22 @@ function InventoryDashboard({ business, theme, stats, query, filter, products, i
 
         <section className={`overflow-hidden rounded-lg border ${theme.panel}`}>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] table-fixed border-collapse">
+            <table className="w-full min-w-[1120px] table-fixed border-collapse">
               <thead className={theme.tableHead}>
                 <tr className="text-left text-xs font-extrabold uppercase tracking-wide">
-                  <th className="w-[24%] px-4 py-4">Producto</th>
-                  <th className="w-[12%] px-4 py-4">Categoria</th>
-                  <th className="w-[12%] px-4 py-4">Precio</th>
-                  <th className="w-[13%] px-4 py-4">Existencias</th>
-                  <th className="w-[12%] px-4 py-4">Estado</th>
-                  <th className="w-[17%] px-4 py-4">Comentarios</th>
+                  <th className="w-[22%] px-4 py-4">Producto</th>
+                  <th className="w-[11%] px-4 py-4">Categoria</th>
+                  <th className="w-[10%] px-4 py-4">{isAtain ? "Spot" : "Precio"}</th>
+                  {isAtain && <th className="w-[14%] px-4 py-4">Campana</th>}
+                  <th className="w-[12%] px-4 py-4">Existencias</th>
+                  <th className="w-[11%] px-4 py-4">Estado</th>
+                  <th className="w-[16%] px-4 py-4">Comentarios</th>
                   <th className="w-[10%] px-4 py-4">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {products.map((product) => (
-                  <ProductRow key={product.code} product={product} theme={theme} onEdit={onEdit} onDelete={onDelete} />
+                  <ProductRow key={product.code} product={product} theme={theme} isAtain={isAtain} onEdit={onEdit} onDelete={onDelete} />
                 ))}
               </tbody>
             </table>
@@ -783,7 +819,7 @@ function StatCard({ theme, icon: Icon, value, label, warning, danger }) {
   );
 }
 
-function ProductRow({ product, theme, onEdit, onDelete }) {
+function ProductRow({ product, theme, isAtain, onEdit, onDelete }) {
   return (
     <tr className={`border-t ${theme.row}`}>
       <td className="px-4 py-3">
@@ -800,7 +836,8 @@ function ProductRow({ product, theme, onEdit, onDelete }) {
         </div>
       </td>
       <td className="px-4 py-3"><Pill className={theme.softAccent}>{product.category}</Pill></td>
-      <td className="px-4 py-3 font-extrabold">{money.format(product.price)}</td>
+      <td className="px-4 py-3 font-extrabold">{isAtain ? (product.spot || "Sin spot") : money.format(product.price)}</td>
+      {isAtain && <td className={`truncate px-4 py-3 text-sm font-extrabold ${theme.muted}`} title={product.campaign || ""}>{product.campaign || "Sin campana"}</td>}
       <td className="px-4 py-3 font-extrabold">{product.stock} <StockPill product={product} /></td>
       <td className="px-4 py-3"><Pill className={tagClass(product.tag)}>{product.tag}</Pill></td>
       <td className={`truncate px-4 py-3 text-sm font-semibold ${theme.muted}`} title={product.comments || ""}>{product.comments || "Sin comentarios"}</td>
@@ -842,8 +879,9 @@ function PasswordModal({ onClose, onSubmit }) {
     </div>
   );
 }
-function ProductDrawer({ product, onClose, onSubmit }) {
+function ProductDrawer({ business, product, onClose, onSubmit }) {
   const title = product ? "Editar Producto" : "Agregar Producto";
+  const isAtain = business?.id === "atain";
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 px-4 py-6 backdrop-blur-[1px]">
@@ -859,9 +897,22 @@ function ProductDrawer({ product, onClose, onSubmit }) {
           <ModalField label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-6" />
           <ModalField label="Categoria" name="category" defaultValue={product?.category} required className="sm:col-span-3" />
           <ModalField label="Codigo de producto" name="code" defaultValue={product?.code} disabled={Boolean(product)} required className="sm:col-span-3" />
-          <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
+          {isAtain ? (
+            <ModalField label="Spot" name="spot" defaultValue={product?.spot || ""} className="sm:col-span-2" />
+          ) : (
+            <ModalField label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
+          )}
           <ModalField label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required className="sm:col-span-2" />
           <ModalField label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} className="sm:col-span-2" />
+          {isAtain && (
+            <label className="grid min-w-0 gap-2 sm:col-span-6">
+              <span className="text-sm font-bold text-neutral-600">Campana</span>
+              <select name="campaign" defaultValue={product?.campaign || ""} className="h-[43px] w-full min-w-0 rounded-lg border border-pink-300 px-3 text-sm text-neutral-900 outline-none transition focus:border-pink-500 focus:ring-2 focus:ring-pink-200">
+                <option value="">Seleccionar campana</option>
+                {atainCampaigns.map((campaign) => <option key={campaign} value={campaign}>{campaign}</option>)}
+              </select>
+            </label>
+          )}
           <ModalField label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} className="sm:col-span-3" />
           <ModalField label="Marca" name="brand" defaultValue={product?.brand || ""} className="sm:col-span-3" />
           <ModalField label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." className="sm:col-span-6" />
@@ -917,7 +968,7 @@ function tagClass(tag) {
 function matchesSearch(product, query) {
   if (!query.trim()) return true;
   const needle = query.toLowerCase();
-  return [product.name, product.code, product.category, product.tag, product.comments].some((value) => String(value || "").toLowerCase().includes(needle));
+  return [product.name, product.code, product.category, product.tag, product.spot, product.campaign, product.comments].some((value) => String(value || "").toLowerCase().includes(needle));
 }
 
 function matchesFilter(product, filter) {
@@ -926,6 +977,8 @@ function matchesFilter(product, filter) {
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
+
 
 
 

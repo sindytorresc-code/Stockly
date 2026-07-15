@@ -29,7 +29,7 @@ Antes de que la web guarde productos en Supabase debes ejecutar SQL en Supabase:
 
 - `clients`
 - `products`
-- columnas extra como `brand`, `purchase_price` y `min_stock`
+- columnas extra como `brand`, `purchase_price`, `min_stock`, `spot` y `campaign`
 - clientes iniciales: `atain`, `sabor`, `vogue`, `mara`
 
 `public-demo-policies.sql` crea politicas RLS para que la app publicada pueda leer, crear, editar y borrar usando la `anon public key`.
@@ -46,3 +46,4 @@ Antes de que la web guarde productos en Supabase debes ejecutar SQL en Supabase:
 La `anon public key` puede vivir en frontend. La `service_role key` nunca debe ponerse en la app.
 
 `public-demo-policies.sql` esta pensado para demo publica. Para produccion real, lo ideal es migrar el PIN a Supabase Auth o una Edge Function que valide hashes del lado servidor, y usar politicas por usuario/cliente.
+
