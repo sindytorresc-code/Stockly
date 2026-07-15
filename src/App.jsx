@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  Database,
   Delete,
   DollarSign,
   Monitor,
@@ -669,6 +670,7 @@ function PinModal({ business, pin, error, onClose, onKey }) {
 
 function InventoryDashboard({ business, theme, stats, query, filter, products, isLoadingProducts, dataSource, onBack, onQuery, onFilter, onAdd, onEdit, onDelete, onImport, onChangePassword }) {
   const Icon = iconMap[business.icon];
+  const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
   const filterOptions = [
     ["all", "Todos"],
     ["stock", "En stock"],
@@ -694,6 +696,9 @@ function InventoryDashboard({ business, theme, stats, query, filter, products, i
               </span>
             </div>
             <div className="flex flex-wrap gap-3">
+              <div className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/20 px-4 text-sm font-extrabold">
+                <Database size={18} /> Datos: {sourceText}
+              </div>
               <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">
                 <Upload size={18} /> Cargar archivo
                 <input type="file" accept=".csv" className="hidden" onChange={onImport} />
@@ -717,7 +722,9 @@ function InventoryDashboard({ business, theme, stats, query, filter, products, i
           <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
         </section>
 
-        <div className={`mt-5 inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${theme.panelSoft}`}>Datos: {dataSource}{isLoadingProducts ? " sincronizando..." : ""}</div>
+        <div className={`mt-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ${theme.panelSoft}`}>
+          <Database size={14} /> Datos: {sourceText}
+        </div>
 
         <section className="my-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <label className={`flex h-11 w-full max-w-xl items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
@@ -919,6 +926,7 @@ function matchesFilter(product, filter) {
   if (filter === "empty") return product.stock === 0;
   return true;
 }
+
 
 
 
