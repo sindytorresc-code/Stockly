@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { businesses } from "../data/businesses.js";
-import { loadPins, savePins } from "./storage.js";
-import {
-  fetchSupabasePin,
-  fetchSupabasePins,
-  hasSupabaseConfig,
-  updateSupabasePin,
-} from "./supabase.js";
+import { loadPins, savePins } from "../lib/storage.js";
+import { fetchSupabasePin, initSupabase, updateSupabasePin } from "../lib/supabase.js";
 
 export function usePinSync(showToast) {
   const defaultPinsByBusiness = useMemo(
@@ -15,32 +10,29 @@ export function usePinSync(showToast) {
   );
 
   const activePinRef = useRef(null);
-  const [pinsByBusiness, setPinsByBusiness] = useState(() =>
-    hasSupabaseConfig ? {} : loadPins(),
-  );
-  const [pinsReady, setPinsReady] = useState(!hasSupabaseConfig);
+  const remotePinsRef = useRef(false);
+  const [remotePinsEnabled, setRemotePinsEnabled] = useState(false);
+  const [pinsByBusiness, setPinsByBusiness] = useState(loadPins);
+  const [pinsReady, setPinsReady] = useState(false);
 
   useEffect(() => {
-    if (!hasSupabaseConfig) {
-      setPinsByBusiness(loadPins());
-      setPinsReady(true);
-      return;
-    }
-
     let cancelled = false;
 
-    fetchSupabasePins()
-      .then((remote) => {
+    initSupabase()
+      .then((config) => {
         if (cancelled) return;
-        const merged = { ...defaultPinsByBusiness, ...remote };
-        setPinsByBusiness(merged);
-        savePins(merged);
+        const enabled = Boolean(config);
+        remotePinsRef.current = enabled;
+        setRemotePinsEnabled(enabled);
+        if (!enabled) {
+          setPinsByBusiness(loadPins());
+        }
         setPinsReady(true);
       })
       .catch((error) => {
         console.error(error);
         if (!cancelled) {
-          showToast("No pude cargar las claves desde Supabase");
+          showToast("No pude conectar con Supabase para las claves");
           setPinsReady(true);
         }
       });
@@ -48,49 +40,52 @@ export function usePinSync(showToast) {
     return () => {
       cancelled = true;
     };
-  }, [defaultPinsByBusiness, showToast]);
+  }, [showToast]);
 
   const loadActivePin = useCallback(
     async (businessId) => {
-      if (!hasSupabaseConfig) {
-        const pin = pinsByBusiness[businessId] || defaultPinsByBusiness[businessId];
+      const config = await initSupabase();
+      if (config) {
+        remotePinsRef.current = true;
+        setRemotePinsEnabled(true);
+
+        const remotePin = await fetchSupabasePin(businessId);
+        const pin = remotePin ?? defaultPinsByBusiness[businessId];
         activePinRef.current = pin;
         return pin;
       }
 
-      const remotePin = await fetchSupabasePin(businessId);
-      const pin = remotePin || defaultPinsByBusiness[businessId];
+      remotePinsRef.current = false;
+      setRemotePinsEnabled(false);
+      const pin = pinsByBusiness[businessId] || defaultPinsByBusiness[businessId];
       activePinRef.current = pin;
-
-      setPinsByBusiness((current) => {
-        const next = { ...current, [businessId]: pin };
-        savePins(next);
-        return next;
-      });
-
       return pin;
     },
     [defaultPinsByBusiness, pinsByBusiness],
   );
 
   const savePin = useCallback(async (businessId, newPin) => {
-    if (hasSupabaseConfig) {
-      await updateSupabasePin(businessId, newPin);
-      activePinRef.current = newPin;
+    const config = await initSupabase();
+    if (config) {
+      remotePinsRef.current = true;
+      setRemotePinsEnabled(true);
+      const saved = await updateSupabasePin(businessId, newPin);
+      activePinRef.current = saved;
+      return saved;
     }
 
+    remotePinsRef.current = false;
+    setRemotePinsEnabled(false);
     setPinsByBusiness((current) => {
       const next = { ...current, [businessId]: newPin };
       savePins(next);
       return next;
     });
-
+    activePinRef.current = newPin;
     return newPin;
   }, []);
 
-  const verifyActivePin = useCallback((attempt) => {
-    return attempt === activePinRef.current;
-  }, []);
+  const verifyActivePin = useCallback((attempt) => attempt === activePinRef.current, []);
 
   return {
     pinsByBusiness,
@@ -98,6 +93,6 @@ export function usePinSync(showToast) {
     loadActivePin,
     savePin,
     verifyActivePin,
-    hasRemotePins: hasSupabaseConfig,
+    hasRemotePins: remotePinsEnabled,
   };
 }

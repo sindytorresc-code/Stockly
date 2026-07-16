@@ -1,16 +1,21 @@
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+import {
+  hasSupabaseConfig,
+  initSupabase,
+  isSupabaseConfigured,
+  requireSupabaseConfig,
+} from "./supabaseConfig.js";
 
-export const hasSupabaseConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+export { hasSupabaseConfig, initSupabase, isSupabaseConfigured };
 
 async function supabaseRequest(path, options = {}) {
-  if (!hasSupabaseConfig) throw new Error("Supabase no esta configurado");
+  const config = await requireSupabaseConfig();
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+  const response = await fetch(`${config.url}/rest/v1${path}`, {
     ...options,
+    cache: "no-store",
     headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: config.key,
+      Authorization: `Bearer ${config.key}`,
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
@@ -54,20 +59,9 @@ export async function ensureSupabaseClient(business) {
   return rows?.[0] || null;
 }
 
-export async function fetchSupabasePins() {
-  if (!hasSupabaseConfig) return {};
-  const rows = await supabaseRequest("/clients?select=slug,pin_hash");
-  const pins = {};
-  for (const row of rows || []) {
-    if (row.pin_hash != null && row.pin_hash !== "") {
-      pins[row.slug] = String(row.pin_hash);
-    }
-  }
-  return pins;
-}
-
 export async function fetchSupabasePin(slug) {
-  if (!hasSupabaseConfig) return null;
+  if (!(await isSupabaseConfigured()) && !(await initSupabase())) return null;
+
   const rows = await supabaseRequest(
     `/clients?slug=eq.${encodeURIComponent(slug)}&select=slug,pin_hash`,
   );
@@ -88,33 +82,15 @@ export async function updateSupabasePin(slug, pin) {
 
   const saved = rows[0].pin_hash != null ? String(rows[0].pin_hash) : null;
   if (saved !== pin) {
-    throw new Error("Supabase no guardo la clave. Verifica la columna pin_hash en clients.");
+    throw new Error("Supabase no guardo la clave en clients.pin_hash");
   }
 
   const verified = await fetchSupabasePin(slug);
   if (verified !== pin) {
-    throw new Error("La clave no se reflejo en Supabase. Recarga el esquema en Supabase e intenta de nuevo.");
+    throw new Error("La clave guardada no coincide con la lectura en Supabase");
   }
 
   return verified;
-}
-
-export async function syncSupabasePins(defaultPinsBySlug) {
-  if (!hasSupabaseConfig) return defaultPinsBySlug;
-
-  const remote = await fetchSupabasePins();
-  const merged = { ...defaultPinsBySlug };
-
-  for (const [slug, defaultPin] of Object.entries(defaultPinsBySlug)) {
-    if (remote[slug]) {
-      merged[slug] = remote[slug];
-    } else {
-      await updateSupabasePin(slug, defaultPin);
-      merged[slug] = defaultPin;
-    }
-  }
-
-  return merged;
 }
 
 export async function fetchSupabaseProducts(clientId) {
