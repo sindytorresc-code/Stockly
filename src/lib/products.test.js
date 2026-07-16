@@ -7,8 +7,9 @@ import {
   mergeProductsByCode,
   parseCsvProducts,
   decodeCsvText,
-  parseAtainAssetCsv,
   isAtainAssetCsv,
+  parseAtainAssetCsv,
+  parseAtainImport,
   parseProductForm,
   validateProduct,
 } from "./products.js";
@@ -142,15 +143,24 @@ describe("parseAtainAssetCsv", () => {
     expect(parseAtainAssetCsv(text, "TRN1")).toHaveLength(1);
   });
 
-  it("finds ATAIN headers even when they are not on the first row", () => {
+  it("parses ATAIN rows by column position when headers are not detected", () => {
     const csv = [
-      "Inventario campana TRN1",
-      "",
-      "spot,modelo,serial,hostname,pantalla 1,pantalla 2,headset,mouse,teclado",
-      "39,Optiplex 3050 Micro,9PP2WP2,BG1DTRN9PP2WP2,CN0SCREEN1,S/N,S/N,CN0MOUSE1,CN0KEY1",
+      "Reporte de activos TRN1",
+      "39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2;CN0SCREEN1;S/N;S/N;CN0MOUSE1;CN0KEY1",
+      "40;ThinkCentre M720q;MJ0BV0T8;BG1DTRNMJ0BV0T8;CN0SCREEN2;;S/N;S/N;CN0KEY2",
     ].join("\n");
 
-    expect(parseAtainAssetCsv(csv, "TRN1")).toHaveLength(1);
+    expect(parseAtainImport(csv, "TRN1")).toHaveLength(2);
+  });
+
+  it("skips sep= lines from Excel", () => {
+    const csv = [
+      "sep=;",
+      "spot;modelo;serial;hostname;pantalla 1;pantalla 2;headset;mouse;teclado",
+      "39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2;CN0SCREEN1;S/N;S/N;CN0MOUSE1;CN0KEY1",
+    ].join("\n");
+
+    expect(parseAtainImport(csv, "TRN1")).toHaveLength(1);
   });
 });
 

@@ -16,6 +16,7 @@ import {
   matchesFilter,
   matchesSearch,
   decodeCsvText,
+  describeAtainImportFailure,
   parseAtainImport,
   parseCsvProducts,
   parseProductForm,
@@ -260,7 +261,7 @@ export default function App() {
       const imported = parseAtainImport(atainImportDraft.text, campaign);
       await importParsedProducts(
         imported,
-        "El archivo no tiene activos validos. Revisa que tenga columnas spot, modelo y serial.",
+        describeAtainImportFailure(atainImportDraft.text),
       );
     } catch (error) {
       console.error(error);

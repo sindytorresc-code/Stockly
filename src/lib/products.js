@@ -121,24 +121,67 @@ function normalizeCsvHeader(value) {
     .replace(/\s+/g, " ");
 }
 
+function cleanCsvText(text) {
+  return String(text || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\0/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\u00a0/g, " ");
+}
+
 export function decodeCsvText(input) {
   if (typeof input === "string") {
-    return input.replace(/^\uFEFF/, "").replace(/\0/g, "");
+    return cleanCsvText(input);
   }
 
   const bytes = new Uint8Array(input);
   if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
-    return new TextDecoder("utf-16le").decode(input).replace(/\0/g, "");
+    return cleanCsvText(new TextDecoder("utf-16le").decode(input));
   }
   if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-    return new TextDecoder("utf-16be").decode(input).replace(/\0/g, "");
+    return cleanCsvText(new TextDecoder("utf-16be").decode(input));
   }
 
-  return new TextDecoder("utf-8").decode(input).replace(/^\uFEFF/, "").replace(/\0/g, "");
+  const utf8 = cleanCsvText(new TextDecoder("utf-8").decode(input));
+  if (csvLooksUsable(utf8)) return utf8;
+
+  try {
+    const windows1252 = cleanCsvText(new TextDecoder("windows-1252").decode(input));
+    if (csvLooksUsable(windows1252)) return windows1252;
+  } catch {
+    // Some runtimes do not expose windows-1252.
+  }
+
+  return utf8;
 }
 
+function splitCsvLines(text) {
+  return decodeCsvText(text)
+    .split(/\r\n|\n|\r/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/^sep\s*=/.test(line.toLowerCase()));
+}
+
+function csvLooksUsable(text) {
+  const rows = splitCsvLines(text);
+  if (!rows.length) return false;
+  return Boolean(findAtainTableStart(rows) || detectAtainDelimiter(rows));
+}
+
+const ATAIN_FIELD_LAYOUT = [
+  "spot",
+  "modelo",
+  "serial",
+  "hostname",
+  "pantalla 1",
+  "pantalla 2",
+  "headset",
+  "mouse",
+  "teclado",
+];
+
 function detectCsvDelimiter(firstLine) {
-  const candidates = [",", ";", "\t"];
+  const candidates = [",", ";", "\t", "|"];
   let best = ",";
   let bestCount = -1;
 
@@ -151,6 +194,29 @@ function detectCsvDelimiter(firstLine) {
   }
 
   return bestCount > 1 ? best : ",";
+}
+
+function detectAtainDelimiter(rows) {
+  const sample = rows.slice(0, Math.min(rows.length, 12));
+  let best = null;
+  let bestScore = -1;
+
+  for (const delimiter of [",", ";", "\t", "|"]) {
+    const counts = sample
+      .map((row) => splitDelimitedRow(row, delimiter).length)
+      .filter((count) => count >= 8);
+
+    if (!counts.length) continue;
+
+    const min = Math.min(...counts);
+    const max = Math.max(...counts);
+    if (min === max && min > bestScore) {
+      bestScore = min;
+      best = delimiter;
+    }
+  }
+
+  return best;
 }
 
 function splitDelimitedRow(row, delimiter = ",") {
@@ -191,10 +257,36 @@ function splitCsvRow(row, delimiter = ",") {
 
 function rowLooksLikeAtainHeaders(headers) {
   const headerSet = new Set(headers.map(normalizeCsvHeader));
-  const hasSpot = headerSet.has("spot");
-  const hasModel = headerSet.has("modelo") || headerSet.has("model");
-  const hasSerial = headerSet.has("serial") || headerSet.has("serie");
+  const hasSpot = headerSet.has("spot") || [...headerSet].some((header) => header.includes("spot"));
+  const hasModel =
+    headerSet.has("modelo") ||
+    headerSet.has("model") ||
+    [...headerSet].some((header) => header.includes("modelo"));
+  const hasSerial =
+    headerSet.has("serial") ||
+    headerSet.has("serie") ||
+    [...headerSet].some((header) => header.includes("serial"));
   return hasSpot && hasModel && hasSerial;
+}
+
+function looksLikeAtainDataRow(cells) {
+  if (!cells || cells.length < 3) return false;
+
+  const spot = String(cells[0] || "").trim();
+  const model = String(cells[1] || "").trim();
+  const serial = String(cells[2] || "").trim();
+
+  if (normalizeCsvHeader(spot) === "spot") return false;
+  if (normalizeCsvHeader(model) === "modelo") return false;
+  if (!spot || !model || isMissingSerial(serial)) return false;
+
+  return true;
+}
+
+function cellsToAtainRecord(cells) {
+  return Object.fromEntries(
+    ATAIN_FIELD_LAYOUT.map((field, index) => [field, String(cells[index] || "").trim()]),
+  );
 }
 
 function findAtainTableStart(rows) {
@@ -209,13 +301,12 @@ function findAtainTableStart(rows) {
 }
 
 function parseCsvTable(text) {
-  const normalizedText = decodeCsvText(text);
-  const rows = normalizedText.split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+  const rows = splitCsvLines(text);
   if (!rows.length) return { headers: [], records: [], delimiter: "," };
 
   const atainStart = findAtainTableStart(rows);
   const headerIndex = atainStart?.headerIndex ?? 0;
-  const delimiter = atainStart?.delimiter ?? detectCsvDelimiter(rows[headerIndex]);
+  const delimiter = atainStart?.delimiter ?? detectAtainDelimiter(rows) ?? detectCsvDelimiter(rows[headerIndex]);
   const headers = (atainStart?.headers ?? splitCsvRow(rows[headerIndex], delimiter)).map(normalizeCsvHeader);
   const records = rows.slice(headerIndex + 1).map((row) => {
     const cells = splitCsvRow(row, delimiter);
@@ -226,9 +317,8 @@ function parseCsvTable(text) {
 }
 
 export function isAtainAssetCsv(text) {
-  const normalizedText = decodeCsvText(text);
-  const rows = normalizedText.split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
-  return Boolean(findAtainTableStart(rows));
+  const rows = splitCsvLines(text);
+  return Boolean(findAtainTableStart(rows) || detectAtainDelimiter(rows));
 }
 
 function pickRecordField(record, ...aliases) {
@@ -317,16 +407,53 @@ function isValidAtainImportedProduct(item) {
 
 export function parseAtainAssetCsv(text, campaign) {
   const { records } = parseCsvTable(text);
-  return records
+  const mapped = records
     .map((record) => mapAtainAssetRecord(record, campaign))
+    .filter((item) => isValidAtainImportedProduct(item));
+
+  if (mapped.length) return mapped;
+  return parseAtainAssetCsvPositional(text, campaign);
+}
+
+function parseAtainAssetCsvPositional(text, campaign) {
+  const rows = splitCsvLines(text);
+  const delimiter = detectAtainDelimiter(rows);
+  if (!delimiter) return [];
+
+  const table = rows.map((row) => splitDelimitedRow(row, delimiter));
+  let startIndex = 0;
+
+  if (table[0] && rowLooksLikeAtainHeaders(table[0])) {
+    startIndex = 1;
+  } else {
+    const firstDataIndex = table.findIndex((cells) => looksLikeAtainDataRow(cells));
+    if (firstDataIndex >= 0) startIndex = firstDataIndex;
+  }
+
+  return table
+    .slice(startIndex)
+    .filter((cells) => looksLikeAtainDataRow(cells))
+    .map((cells) => mapAtainAssetRecord(cellsToAtainRecord(cells), campaign))
     .filter((item) => isValidAtainImportedProduct(item));
 }
 
-export function parseAtainImport(text, campaign) {
-  if (isAtainAssetCsv(text)) {
-    return parseAtainAssetCsv(text, campaign);
+export function describeAtainImportFailure(text) {
+  const rows = splitCsvLines(text);
+  if (!rows.length) {
+    return "El archivo esta vacio o no se pudo leer.";
   }
-  return parseCsvProducts(text);
+
+  const delimiter = detectAtainDelimiter(rows) ?? detectCsvDelimiter(rows[0]);
+  const firstRow = splitDelimitedRow(rows[0], delimiter);
+  const preview = firstRow.slice(0, 4).join(" | ") || "sin encabezados";
+
+  return `Se leyeron ${rows.length} filas y ${firstRow.length} columnas (${preview}). Exporta el Excel como CSV UTF-8 o CSV (delimitado por punto y coma).`;
+}
+
+export function parseAtainImport(text, campaign) {
+  const imported = parseAtainAssetCsv(text, campaign);
+  if (imported.length) return imported;
+  return parseAtainAssetCsvPositional(text, campaign);
 }
 
 export function parseCsvProducts(text, options = {}) {
@@ -335,7 +462,7 @@ export function parseCsvProducts(text, options = {}) {
   }
 
   const { delimiter } = parseCsvTable(text);
-  const rows = decodeCsvText(text).split(/\r?\n/).filter(Boolean);
+  const rows = splitCsvLines(text);
   return rows.slice(1).map((row) => {
     const [
       name,
