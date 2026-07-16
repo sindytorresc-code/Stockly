@@ -37,32 +37,39 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
           <ModalField theme={theme} label="Codigo de producto *" name="code" defaultValue={product?.code} disabled={Boolean(product)} required className="sm:col-span-3" />
 
           {isAtain ? (
-            <ModalField theme={theme} label="Spot" name="spot" defaultValue={product?.spot || ""} className="sm:col-span-2" />
+            <>
+              <ModalField
+                theme={theme}
+                label="Spot *"
+                name="spot"
+                defaultValue={product?.spot || ""}
+                placeholder="Ubicacion del activo en la campana"
+                required
+                className="sm:col-span-3"
+              />
+              <label className="grid min-w-0 gap-2 sm:col-span-3">
+                <span className={`text-sm font-bold ${theme.muted}`}>Campana *</span>
+                <select
+                  name="campaign"
+                  defaultValue={product?.campaign || ""}
+                  required
+                  className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
+                >
+                  <option value="">Seleccionar campana</option>
+                  {atainCampaigns.map((campaign) => (
+                    <option key={campaign} value={campaign}>
+                      {campaign}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           ) : (
             <ModalField theme={theme} label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
           )}
 
           <ModalField theme={theme} label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required className="sm:col-span-2" />
           <ModalField theme={theme} label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} className="sm:col-span-2" />
-
-          {isAtain && (
-            <label className="grid min-w-0 gap-2 sm:col-span-6">
-              <span className={`text-sm font-bold ${theme.muted}`}>Campana</span>
-              <select
-                name="campaign"
-                defaultValue={product?.campaign || ""}
-                className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
-              >
-                <option value="">Seleccionar campana</option>
-                {atainCampaigns.map((campaign) => (
-                  <option key={campaign} value={campaign}>
-                    {campaign}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
           <ModalField theme={theme} label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} className="sm:col-span-3" />
           <ModalField theme={theme} label="Marca" name="brand" defaultValue={product?.brand || ""} className="sm:col-span-3" />
           <ModalField theme={theme} label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." className="sm:col-span-6" />

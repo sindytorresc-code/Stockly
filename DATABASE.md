@@ -41,6 +41,10 @@ Antes de que la web guarde productos en Supabase debes ejecutar SQL en Supabase:
 - Agregar, editar, eliminar e importar CSV intentan guardar en Supabase.
 - Si Supabase falla, se usa `localStorage` como respaldo.
 
+## Claves de acceso
+
+Las claves de 4 digitos se guardan en Supabase (`clients.pin_hash`) para que funcionen en todos los dispositivos. Al cambiar la clave desde cualquier negocio, se actualiza en la base de datos.
+
 ## Seguridad
 
 La `anon public key` puede vivir en frontend. La `service_role key` nunca debe ponerse en la app.

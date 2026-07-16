@@ -46,11 +46,48 @@ export async function ensureSupabaseClient(business) {
       business_type: business.type,
       description: business.description,
       icon: business.icon,
+      pin_hash: business.pin,
       theme: {},
     }),
   });
 
   return rows?.[0] || null;
+}
+
+export async function fetchSupabasePins() {
+  if (!hasSupabaseConfig) return {};
+  const rows = await supabaseRequest("/clients?select=slug,pin_hash");
+  const pins = {};
+  for (const row of rows || []) {
+    if (row.pin_hash) pins[row.slug] = row.pin_hash;
+  }
+  return pins;
+}
+
+export async function updateSupabasePin(slug, pin) {
+  await supabaseRequest(`/clients?slug=eq.${encodeURIComponent(slug)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ pin_hash: pin }),
+  });
+}
+
+export async function syncSupabasePins(defaultPinsBySlug) {
+  if (!hasSupabaseConfig) return defaultPinsBySlug;
+
+  const remote = await fetchSupabasePins();
+  const merged = { ...defaultPinsBySlug };
+
+  for (const [slug, defaultPin] of Object.entries(defaultPinsBySlug)) {
+    if (remote[slug]) {
+      merged[slug] = remote[slug];
+    } else {
+      await updateSupabasePin(slug, defaultPin);
+      merged[slug] = defaultPin;
+    }
+  }
+
+  return merged;
 }
 
 export async function fetchSupabaseProducts(clientId) {

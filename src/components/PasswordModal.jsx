@@ -31,7 +31,7 @@ export default function PasswordModal({ theme, onClose, onSubmit }) {
           <ModalField theme={theme} label="Confirmar nueva clave" name="confirmPin" type="password" inputMode="numeric" maxLength="4" required />
         </div>
         <p className={`mt-4 text-xs font-semibold ${theme.muted}`}>
-          La clave debe tener 4 numeros. En esta version se guarda en este navegador.
+          La clave debe tener 4 numeros. Se guarda en Supabase para todos los dispositivos.
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={onClose} className={`h-10 rounded-lg border px-5 text-sm font-extrabold ${theme.panelSoft}`}>

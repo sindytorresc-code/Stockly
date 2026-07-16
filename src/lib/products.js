@@ -88,6 +88,9 @@ export function validateProduct(product, isAtain) {
     if (Number.isNaN(product.price) || product.price < 0) {
       return "Precio invalido";
     }
+  } else {
+    if (!product.spot) return "Completa el spot del activo";
+    if (!product.campaign) return "Selecciona la campana";
   }
   if (Number.isNaN(product.purchasePrice) || product.purchasePrice < 0) {
     return "Precio de compra invalido";

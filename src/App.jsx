@@ -18,6 +18,7 @@ import {
   validateProduct,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
+import { hasSupabaseConfig, syncSupabasePins, updateSupabasePin } from "./lib/supabase.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin, loadPins, savePins } from "./lib/storage.js";
 
@@ -58,6 +59,10 @@ export default function App() {
   );
 
   const stats = useMemo(() => computeStats(products), [products]);
+  const defaultPinsByBusiness = useMemo(
+    () => Object.fromEntries(businesses.map((business) => [business.id, business.pin])),
+    [],
+  );
 
   const resetSessionFilters = useCallback(() => {
     setFilter("all");
@@ -131,6 +136,17 @@ export default function App() {
   useEffect(() => {
     if (selectedBusiness) loadInventory(selectedBusiness);
   }, [selectedBusiness, loadInventory]);
+
+  useEffect(() => {
+    if (!hasSupabaseConfig) return;
+
+    syncSupabasePins(defaultPinsByBusiness)
+      .then((merged) => {
+        setPinsByBusiness(merged);
+        savePins(merged);
+      })
+      .catch((error) => console.error("No pude sincronizar claves desde Supabase", error));
+  }, [defaultPinsByBusiness]);
 
   useEffect(() => {
     if (!pinBusiness) return undefined;
@@ -230,7 +246,7 @@ export default function App() {
     reader.readAsText(file);
   }
 
-  function handleChangePassword(event) {
+  async function handleChangePassword(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const currentPin = String(form.get("currentPin") || "").trim();
@@ -251,11 +267,21 @@ export default function App() {
       return;
     }
 
-    const nextPins = { ...pinsByBusiness, [selectedBusiness.id]: newPin };
-    setPinsByBusiness(nextPins);
-    savePins(nextPins);
-    setPasswordModalOpen(false);
-    showToast("Clave actualizada");
+    try {
+      const nextPins = { ...pinsByBusiness, [selectedBusiness.id]: newPin };
+      setPinsByBusiness(nextPins);
+      savePins(nextPins);
+
+      if (hasSupabaseConfig) {
+        await updateSupabasePin(selectedBusiness.id, newPin);
+      }
+
+      setPasswordModalOpen(false);
+      showToast("Clave actualizada");
+    } catch (error) {
+      console.error(error);
+      showToast(formatSupabaseError(error, "No pude guardar la clave en Supabase"));
+    }
   }
 
   return (
