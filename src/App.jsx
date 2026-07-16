@@ -34,7 +34,7 @@ export default function App() {
     deleteProduct,
     importProducts,
   } = useInventorySync(showToast);
-  const { pinsByBusiness, pinsReady, savePin, refreshPinForBusiness } = usePinSync(showToast);
+  const { pinsByBusiness, pinsReady, loadActivePin, savePin, verifyActivePin, hasRemotePins } = usePinSync(showToast);
 
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [pinBusiness, setPinBusiness] = useState(initialRouteBusiness);
@@ -74,7 +74,7 @@ export default function App() {
       setPinError("");
       setPinLoading(true);
       try {
-        await refreshPinForBusiness(business.id);
+        await loadActivePin(business.id);
       } catch (error) {
         console.error(error);
         showToast(formatSupabaseError(error, "No pude cargar la clave"));
@@ -82,7 +82,7 @@ export default function App() {
         setPinLoading(false);
       }
     },
-    [refreshPinForBusiness, showToast],
+    [loadActivePin, showToast],
   );
 
   const closePin = useCallback(() => {
@@ -112,7 +112,11 @@ export default function App() {
 
       if (nextPin.length !== 4) return;
 
-      if (nextPin === getBusinessPin(pinBusiness, pinsByBusiness)) {
+      const isValid = hasRemotePins
+        ? verifyActivePin(nextPin)
+        : nextPin === getBusinessPin(pinBusiness, pinsByBusiness);
+
+      if (isValid) {
         setSelectedBusiness(pinBusiness);
         navigateToPath(businessPath(pinBusiness), true);
         setPinBusiness(null);
@@ -124,7 +128,7 @@ export default function App() {
       setPinError("Codigo incorrecto");
       setPin("");
     },
-    [pin, pinBusiness, pinsByBusiness, pinsReady, pinLoading, resetSessionFilters],
+    [pin, pinBusiness, pinsByBusiness, pinsReady, pinLoading, hasRemotePins, verifyActivePin, resetSessionFilters],
   );
 
   useEffect(() => {
@@ -135,11 +139,17 @@ export default function App() {
       setPin("");
       setPinError("");
       resetSessionFilters();
+      if (routeBusiness) {
+        setPinLoading(true);
+        loadActivePin(routeBusiness.id)
+          .catch((error) => console.error(error))
+          .finally(() => setPinLoading(false));
+      }
     }
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [resetSessionFilters]);
+  }, [loadActivePin, resetSessionFilters]);
 
   useEffect(() => {
     if (selectedBusiness) loadInventory(selectedBusiness);
@@ -148,10 +158,10 @@ export default function App() {
   useEffect(() => {
     if (!initialRouteBusiness) return;
 
-    refreshPinForBusiness(initialRouteBusiness.id)
+    loadActivePin(initialRouteBusiness.id)
       .catch((error) => console.error(error))
       .finally(() => setPinLoading(false));
-  }, [initialRouteBusiness, refreshPinForBusiness]);
+  }, [initialRouteBusiness, loadActivePin]);
 
   useEffect(() => {
     if (!pinBusiness) return undefined;
@@ -257,12 +267,7 @@ export default function App() {
     const currentPin = String(form.get("currentPin") || "").trim();
     const newPin = String(form.get("newPin") || "").trim();
     const confirmPin = String(form.get("confirmPin") || "").trim();
-    const activePin = getBusinessPin(selectedBusiness, pinsByBusiness);
 
-    if (currentPin !== activePin) {
-      showToast("La clave actual no coincide");
-      return;
-    }
     if (!/^\d{4}$/.test(newPin)) {
       showToast("La nueva clave debe tener 4 numeros");
       return;
@@ -273,9 +278,15 @@ export default function App() {
     }
 
     try {
+      const activePin = await loadActivePin(selectedBusiness.id);
+      if (currentPin !== activePin) {
+        showToast("La clave actual no coincide");
+        return;
+      }
+
       await savePin(selectedBusiness.id, newPin);
       setPasswordModalOpen(false);
-      showToast("Clave actualizada en Supabase");
+      showToast(hasRemotePins ? "Clave actualizada en Supabase" : "Clave actualizada");
     } catch (error) {
       console.error(error);
       showToast(formatSupabaseError(error, "No pude guardar la clave en Supabase"));

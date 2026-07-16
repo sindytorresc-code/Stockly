@@ -59,9 +59,20 @@ export async function fetchSupabasePins() {
   const rows = await supabaseRequest("/clients?select=slug,pin_hash");
   const pins = {};
   for (const row of rows || []) {
-    if (row.pin_hash) pins[row.slug] = row.pin_hash;
+    if (row.pin_hash != null && row.pin_hash !== "") {
+      pins[row.slug] = String(row.pin_hash);
+    }
   }
   return pins;
+}
+
+export async function fetchSupabasePin(slug) {
+  if (!hasSupabaseConfig) return null;
+  const rows = await supabaseRequest(
+    `/clients?slug=eq.${encodeURIComponent(slug)}&select=slug,pin_hash`,
+  );
+  const value = rows?.[0]?.pin_hash;
+  return value != null && value !== "" ? String(value) : null;
 }
 
 export async function updateSupabasePin(slug, pin) {
@@ -75,11 +86,17 @@ export async function updateSupabasePin(slug, pin) {
     throw new Error(`No se encontro el cliente ${slug} en Supabase`);
   }
 
-  if (rows[0].pin_hash !== pin) {
+  const saved = rows[0].pin_hash != null ? String(rows[0].pin_hash) : null;
+  if (saved !== pin) {
     throw new Error("Supabase no guardo la clave. Verifica la columna pin_hash en clients.");
   }
 
-  return rows[0].pin_hash;
+  const verified = await fetchSupabasePin(slug);
+  if (verified !== pin) {
+    throw new Error("La clave no se reflejo en Supabase. Recarga el esquema en Supabase e intenta de nuevo.");
+  }
+
+  return verified;
 }
 
 export async function syncSupabasePins(defaultPinsBySlug) {
