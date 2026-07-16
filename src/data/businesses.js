@@ -153,8 +153,8 @@ export const businesses = [
   },
   {
     id: "mara",
-    type: "REVESTIR",
-    name: "Maquillaje de Mara",
+    type: "COSMETICOS",
+    name: "Mara Makeup",
     description: "Tienda de cosmeticos y productos de cuidado",
     icon: "sparkles",
     cardGradient: "from-pink-500 to-violet-500",
