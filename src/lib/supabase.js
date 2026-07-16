@@ -33,6 +33,26 @@ export async function fetchSupabaseClient(slug) {
   return rows?.[0] || null;
 }
 
+export async function ensureSupabaseClient(business) {
+  const existing = await fetchSupabaseClient(business.id);
+  if (existing) return existing;
+
+  const rows = await supabaseRequest("/clients", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      slug: business.id,
+      name: business.name,
+      business_type: business.type,
+      description: business.description,
+      icon: business.icon,
+      theme: {},
+    }),
+  });
+
+  return rows?.[0] || null;
+}
+
 export async function fetchSupabaseProducts(clientId) {
   return supabaseRequest(
     `/products?client_id=eq.${clientId}&select=*&order=created_at.desc`,

@@ -18,7 +18,7 @@ import {
   validateProduct,
 } from "./lib/products.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
-import { getBusinessPin, loadPins, loadProducts, savePins } from "./lib/storage.js";
+import { getBusinessPin, loadPins, savePins } from "./lib/storage.js";
 
 export default function App() {
   const initialRouteBusiness = businessFromPath();
@@ -31,7 +31,7 @@ export default function App() {
     saveProduct,
     deleteProduct,
     importProducts,
-  } = useInventorySync(loadProducts(), showToast);
+  } = useInventorySync(showToast);
 
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [pinBusiness, setPinBusiness] = useState(initialRouteBusiness);
@@ -182,16 +182,26 @@ export default function App() {
       return;
     }
 
-    await saveProduct(selectedBusiness, product, editingProduct);
-    closeProductForm();
-    showToast("Inventario actualizado");
+    try {
+      await saveProduct(selectedBusiness, product, editingProduct);
+      closeProductForm();
+      showToast("Inventario actualizado");
+    } catch (error) {
+      console.error(error);
+      showToast("No pude guardar en Supabase");
+    }
   }
 
   async function confirmDeleteProduct() {
     if (!selectedBusiness || !productToDelete) return;
-    await deleteProduct(selectedBusiness, productToDelete);
-    setProductToDelete(null);
-    showToast("Producto eliminado");
+    try {
+      await deleteProduct(selectedBusiness, productToDelete);
+      setProductToDelete(null);
+      showToast("Producto eliminado");
+    } catch (error) {
+      console.error(error);
+      showToast("No pude eliminar en Supabase");
+    }
   }
 
   function handleImportCsv(event) {

@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from "react";
-import { saveProducts } from "../lib/storage.js";
+import { defaultProducts } from "../data/businesses.js";
+import { loadProducts, saveProducts } from "../lib/storage.js";
 import {
   dbProductToApp,
   deleteSupabaseProduct,
-  fetchSupabaseClient,
+  ensureSupabaseClient,
   hasSupabaseConfig,
   seedSupabaseProductsIfEmpty,
   upsertSupabaseProduct,
@@ -11,8 +12,12 @@ import {
 } from "../lib/supabase.js";
 import { mergeProductsByCode } from "../lib/products.js";
 
-export function useInventorySync(initialProducts, showToast) {
-  const [productsByBusiness, setProductsByBusiness] = useState(initialProducts);
+function initialProductsState() {
+  return hasSupabaseConfig ? {} : loadProducts();
+}
+
+export function useInventorySync(showToast) {
+  const [productsByBusiness, setProductsByBusiness] = useState(initialProductsState);
   const [clientIdsByBusiness, setClientIdsByBusiness] = useState({});
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [dataSource, setDataSource] = useState(hasSupabaseConfig ? "Supabase" : "Local");
@@ -25,13 +30,17 @@ export function useInventorySync(initialProducts, showToast) {
       const currentList = current[businessId] || [];
       const nextList = typeof updater === "function" ? updater(currentList) : updater;
       const next = { ...current, [businessId]: nextList };
-      try {
-        saveProducts(next);
-      } catch (error) {
-        console.error(error);
-        showToast("No hay espacio local para guardar los datos");
-        return current;
+
+      if (!hasSupabaseConfig) {
+        try {
+          saveProducts(next);
+        } catch (error) {
+          console.error(error);
+          showToast("No hay espacio local para guardar los datos");
+          return current;
+        }
       }
+
       return next;
     });
   }, [showToast]);
@@ -39,8 +48,8 @@ export function useInventorySync(initialProducts, showToast) {
   const getClientIdForBusiness = useCallback(async (business) => {
     if (clientIdsRef.current[business.id]) return clientIdsRef.current[business.id];
 
-    const client = await fetchSupabaseClient(business.id);
-    if (!client) throw new Error(`No existe el cliente ${business.id} en Supabase`);
+    const client = await ensureSupabaseClient(business);
+    if (!client) throw new Error(`No pude crear el cliente ${business.id} en Supabase`);
 
     setClientIdsByBusiness((current) => ({ ...current, [business.id]: client.id }));
     return client.id;
@@ -50,6 +59,10 @@ export function useInventorySync(initialProducts, showToast) {
     async (business) => {
       if (!hasSupabaseConfig) {
         setDataSource("Local");
+        setProductsByBusiness((current) => ({
+          ...current,
+          [business.id]: current[business.id] || defaultProducts[business.id] || [],
+        }));
         return;
       }
 
@@ -61,8 +74,8 @@ export function useInventorySync(initialProducts, showToast) {
         setDataSource("Supabase");
       } catch (error) {
         console.error(error);
-        setDataSource("Local");
-        showToast("No pude conectar Supabase; usando datos locales");
+        setDataSource("Error Supabase");
+        showToast("No pude cargar datos desde Supabase");
       } finally {
         setIsLoadingProducts(false);
       }
@@ -72,73 +85,59 @@ export function useInventorySync(initialProducts, showToast) {
 
   const saveProduct = useCallback(
     async (business, product, editingProduct) => {
-      let savedProduct = { ...product, dbId: editingProduct?.dbId };
-
-      if (hasSupabaseConfig) {
-        try {
-          const clientId = await getClientIdForBusiness(business);
-          savedProduct = await upsertSupabaseProduct(clientId, product);
-          setDataSource("Supabase");
-        } catch (error) {
-          console.error(error);
-          setDataSource("Local");
-          showToast("No pude guardar en Supabase; guardado local");
-        }
+      if (!hasSupabaseConfig) {
+        const savedProduct = { ...product, dbId: editingProduct?.dbId };
+        updateBusinessProducts(business.id, (currentProducts) =>
+          editingProduct
+            ? currentProducts.map((item) => (item.code === editingProduct.code ? savedProduct : item))
+            : [savedProduct, ...currentProducts.filter((item) => item.code !== savedProduct.code)],
+        );
+        return savedProduct;
       }
 
+      const clientId = await getClientIdForBusiness(business);
+      const savedProduct = await upsertSupabaseProduct(clientId, product);
       updateBusinessProducts(business.id, (currentProducts) =>
         editingProduct
           ? currentProducts.map((item) => (item.code === editingProduct.code ? savedProduct : item))
           : [savedProduct, ...currentProducts.filter((item) => item.code !== savedProduct.code)],
       );
-
+      setDataSource("Supabase");
       return savedProduct;
     },
-    [getClientIdForBusiness, showToast, updateBusinessProducts],
+    [getClientIdForBusiness, updateBusinessProducts],
   );
 
   const deleteProduct = useCallback(
     async (business, product) => {
-      if (hasSupabaseConfig && product) {
-        try {
-          const clientId = await getClientIdForBusiness(business);
-          await deleteSupabaseProduct(clientId, product);
-          setDataSource("Supabase");
-        } catch (error) {
-          console.error(error);
-          setDataSource("Local");
-          showToast("No pude borrar en Supabase; borrado local");
-        }
+      if (hasSupabaseConfig) {
+        const clientId = await getClientIdForBusiness(business);
+        await deleteSupabaseProduct(clientId, product);
+        setDataSource("Supabase");
       }
 
       updateBusinessProducts(business.id, (currentProducts) =>
         currentProducts.filter((item) => item.code !== product.code),
       );
     },
-    [getClientIdForBusiness, showToast, updateBusinessProducts],
+    [getClientIdForBusiness, updateBusinessProducts],
   );
 
   const importProducts = useCallback(
     async (business, imported) => {
       if (hasSupabaseConfig && imported.length) {
-        try {
-          const clientId = await getClientIdForBusiness(business);
-          const rows = await upsertSupabaseProducts(clientId, imported);
-          const synced = rows?.map(dbProductToApp) || imported;
-          updateBusinessProducts(business.id, (currentProducts) => mergeProductsByCode(currentProducts, synced));
-          setDataSource("Supabase");
-          return imported.length;
-        } catch (error) {
-          console.error(error);
-          setDataSource("Local");
-          showToast("No pude importar en Supabase; importado local");
-        }
+        const clientId = await getClientIdForBusiness(business);
+        const rows = await upsertSupabaseProducts(clientId, imported);
+        const synced = rows?.map(dbProductToApp) || imported;
+        updateBusinessProducts(business.id, (currentProducts) => mergeProductsByCode(currentProducts, synced));
+        setDataSource("Supabase");
+        return imported.length;
       }
 
       updateBusinessProducts(business.id, (currentProducts) => mergeProductsByCode(currentProducts, imported));
       return imported.length;
     },
-    [getClientIdForBusiness, showToast, updateBusinessProducts],
+    [getClientIdForBusiness, updateBusinessProducts],
   );
 
   return {
