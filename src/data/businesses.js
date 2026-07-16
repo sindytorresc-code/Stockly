@@ -41,6 +41,23 @@ export const PRODUCT_TAGS = [
   "Agotado",
 ];
 
+export const ATAIN_ASSET_CATEGORIES = [
+  "Desktop",
+  "Pantalla",
+  "Headset",
+  "Mouse",
+  "Teclado",
+];
+
+export const ATAIN_ASSET_FILTERS = [
+  ["all", "Todos"],
+  ["desktop", "Desktop"],
+  ["pantalla", "Pantalla"],
+  ["headset", "Headset"],
+  ["mouse", "Mouse"],
+  ["teclado", "Teclado"],
+];
+
 export const businesses = [
   {
     id: "atain",

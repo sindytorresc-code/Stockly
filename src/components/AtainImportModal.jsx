@@ -51,8 +51,8 @@ export default function AtainImportModal({ theme, fileName, onClose, onConfirm }
         </label>
 
         <p className={`mt-4 text-xs leading-relaxed ${theme.muted}`}>
-          En Excel usa Archivo → Guardar como → CSV UTF-8 (delimitado por comas) o CSV (delimitado por punto y coma).
-          Las columnas deben ir en este orden: spot, modelo, serial, hostname, pantalla 1, pantalla 2, headset, mouse, teclado.
+          Cada fila del Excel se separa en activos: Desktop, Pantalla 1, Pantalla 2, Headset, Mouse y Teclado.
+          Exporta como CSV UTF-8 o CSV (punto y coma).
         </p>
 
         <button type="submit" className={`mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg font-bold ${theme.accent}`}>

@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { atainCampaigns, PRODUCT_TAGS } from "../data/businesses.js";
+import { atainCampaigns, ATAIN_ASSET_CATEGORIES, PRODUCT_TAGS } from "../data/businesses.js";
 import { useEscapeKey } from "../hooks/useEscapeKey.js";
 import ModalField from "./ui/ModalField.jsx";
 
@@ -33,8 +33,27 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <ModalField theme={theme} label="Nombre *" name="name" defaultValue={product?.name} required autoFocus className="sm:col-span-6" />
-          <ModalField theme={theme} label="Categoria *" name="category" defaultValue={product?.category} required className="sm:col-span-3" />
-          <ModalField theme={theme} label="Codigo de producto *" name="code" defaultValue={product?.code} disabled={Boolean(product)} required className="sm:col-span-3" />
+          {isAtain ? (
+            <label className="grid min-w-0 gap-2 sm:col-span-3">
+              <span className={`text-sm font-bold ${theme.muted}`}>Tipo de activo *</span>
+              <select
+                name="category"
+                defaultValue={product?.category || ""}
+                required
+                className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
+              >
+                <option value="">Seleccionar tipo</option>
+                {ATAIN_ASSET_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <ModalField theme={theme} label="Categoria *" name="category" defaultValue={product?.category} required className="sm:col-span-3" />
+          )}
+          <ModalField theme={theme} label="Serial / Codigo *" name="code" defaultValue={product?.code} disabled={Boolean(product)} required className="sm:col-span-3" />
 
           {isAtain ? (
             <>

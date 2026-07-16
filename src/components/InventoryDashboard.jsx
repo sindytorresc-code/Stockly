@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
+import { ATAIN_ASSET_FILTERS } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
 import { money } from "../lib/money.js";
 import ProductRow from "./ProductRow.jsx";
@@ -36,12 +37,14 @@ export default function InventoryDashboard({
   const Icon = iconMap[business.icon];
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
   const isAtain = business.id === "atain";
-  const filterOptions = [
-    ["all", "Todos"],
-    ["stock", "En stock"],
-    ["low", "Stock bajo"],
-    ["empty", "Agotados"],
-  ];
+  const filterOptions = isAtain
+    ? ATAIN_ASSET_FILTERS
+    : [
+        ["all", "Todos"],
+        ["stock", "En stock"],
+        ["low", "Stock bajo"],
+        ["empty", "Agotados"],
+      ];
 
   return (
     <>
@@ -80,7 +83,7 @@ export default function InventoryDashboard({
                 onClick={onAdd}
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/20 px-4 font-bold"
               >
-                <Plus size={18} /> Agregar Producto
+                <Plus size={18} /> Agregar activo
               </button>
             </div>
           </div>
@@ -107,16 +110,20 @@ export default function InventoryDashboard({
               value={query}
               onChange={(event) => onQuery(event.target.value)}
               className="w-full bg-transparent outline-none"
-              placeholder="Buscar producto, categoria, codigo, campana o comentario..."
+              placeholder={
+                isAtain
+                  ? "Buscar por spot, serial, campana, tipo o hostname..."
+                  : "Buscar producto, categoria, codigo, campana o comentario..."
+              }
             />
           </label>
-          <div className="flex gap-2 overflow-x-auto">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {filterOptions.map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => onFilter(value)}
-                className={`h-11 rounded-lg border px-4 text-sm font-extrabold ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                className={`h-11 shrink-0 rounded-lg border px-4 text-sm font-extrabold ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
               >
                 {label}
               </button>
@@ -126,16 +133,29 @@ export default function InventoryDashboard({
 
         <section className={`overflow-hidden rounded-lg border ${theme.panel}`}>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] table-fixed border-collapse">
+            <table className={`w-full border-collapse ${isAtain ? "min-w-[980px]" : "min-w-[1120px]"} table-fixed`}>
               <thead className={theme.tableHead}>
                 <tr className="text-left text-xs font-extrabold uppercase tracking-wide">
-                  <th className="w-[22%] px-4 py-4">Producto</th>
-                  <th className="w-[11%] px-4 py-4">Categoria</th>
-                  <th className="w-[10%] px-4 py-4">{isAtain ? "Spot" : "Precio"}</th>
-                  {isAtain && <th className="w-[14%] px-4 py-4">Campana</th>}
-                  <th className="w-[12%] px-4 py-4">Existencias</th>
-                  <th className="w-[11%] px-4 py-4">Estado</th>
-                  <th className="w-[16%] px-4 py-4">Comentarios</th>
+                  {isAtain ? (
+                    <>
+                      <th className="w-[10%] px-4 py-4">Spot</th>
+                      <th className="w-[12%] px-4 py-4">Tipo</th>
+                      <th className="w-[22%] px-4 py-4">Activo</th>
+                      <th className="w-[16%] px-4 py-4">Serial</th>
+                      <th className="w-[14%] px-4 py-4">Campana</th>
+                      <th className="w-[11%] px-4 py-4">Estado</th>
+                      <th className="w-[17%] px-4 py-4">Detalle</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="w-[22%] px-4 py-4">Producto</th>
+                      <th className="w-[11%] px-4 py-4">Categoria</th>
+                      <th className="w-[10%] px-4 py-4">Precio</th>
+                      <th className="w-[12%] px-4 py-4">Existencias</th>
+                      <th className="w-[11%] px-4 py-4">Estado</th>
+                      <th className="w-[16%] px-4 py-4">Comentarios</th>
+                    </>
+                  )}
                   <th className="w-[10%] px-4 py-4">Acciones</th>
                 </tr>
               </thead>
@@ -155,7 +175,9 @@ export default function InventoryDashboard({
           </div>
           {products.length === 0 && (
             <p className={`py-10 text-center font-semibold ${theme.muted}`}>
-              No hay productos que coincidan con la busqueda.
+              {isAtain
+                ? "No hay activos que coincidan con la busqueda o el filtro."
+                : "No hay productos que coincidan con la busqueda."}
             </p>
           )}
         </section>

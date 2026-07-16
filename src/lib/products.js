@@ -40,6 +40,12 @@ export function matchesFilter(product, filter) {
   return true;
 }
 
+export function matchesAtainAssetFilter(product, filter) {
+  if (filter === "all") return true;
+  const category = String(product.category || "").trim().toLowerCase();
+  return category === filter;
+}
+
 export function computeStats(products, { isAtain = false } = {}) {
   const stats = {
     total: products.length,
@@ -97,6 +103,10 @@ export function validateProduct(product, isAtain) {
   } else {
     if (!product.spot) return "Completa el spot del activo";
     if (!product.campaign) return "Selecciona la campana";
+    const allowed = ["desktop", "pantalla", "headset", "mouse", "teclado"];
+    if (!allowed.includes(String(product.category || "").trim().toLowerCase())) {
+      return "Selecciona el tipo de activo";
+    }
   }
   if (Number.isNaN(product.purchasePrice) || product.purchasePrice < 0) {
     return "Precio de compra invalido";
@@ -330,15 +340,6 @@ function pickRecordField(record, ...aliases) {
   return "";
 }
 
-function deriveAtainCategory(modelo) {
-  const value = String(modelo || "").toLowerCase();
-  if (value.includes("optiplex") || value.includes("thinkcentre") || value.includes("latitude")) {
-    return "Computadores";
-  }
-  if (value.includes("monitor") || value.includes("pantalla")) return "Pantallas";
-  return "Equipos";
-}
-
 function deriveAtainBrand(modelo) {
   const value = String(modelo || "").toLowerCase();
   if (value.includes("optiplex") || value.includes("latitude")) return "Dell";
@@ -351,48 +352,67 @@ function isMissingSerial(value) {
   return !normalized || normalized === "S/N" || normalized === "SN" || normalized === "N/A";
 }
 
-function formatAtainComments(record) {
-  const parts = [];
-  const hostname = String(record.hostname || "").trim();
-  if (hostname) parts.push(`Hostname: ${hostname}`);
-
-  const peripherals = [
-    ["Pantalla 1", pickRecordField(record, "pantalla 1", "pantalla1")],
-    ["Pantalla 2", pickRecordField(record, "pantalla 2", "pantalla2")],
-    ["Headset", pickRecordField(record, "headset")],
-    ["Mouse", pickRecordField(record, "mouse")],
-    ["Teclado", pickRecordField(record, "teclado")],
-  ];
-
-  for (const [label, value] of peripherals) {
-    const serial = String(value || "").trim();
-    if (!isMissingSerial(serial)) parts.push(`${label}: ${serial}`);
-  }
-
-  return parts.join(" | ");
+function formatAtainSpotNote(spot, hostname) {
+  return hostname ? `Spot ${spot} | Hostname: ${hostname}` : `Spot ${spot}`;
 }
 
-function mapAtainAssetRecord(record, campaign) {
+function expandAtainRowToProducts(record, campaign) {
   const spot = pickRecordField(record, "spot");
-  const name = pickRecordField(record, "modelo", "model");
-  const code = pickRecordField(record, "serial", "serie");
+  const campaignValue = String(campaign || pickRecordField(record, "campana", "campaign") || "").trim();
   const hostname = pickRecordField(record, "hostname", "host");
+  const modelo = pickRecordField(record, "modelo", "model");
+  const desktopSerial = pickRecordField(record, "serial", "serie");
 
-  return {
-    name,
-    code,
-    category: deriveAtainCategory(name),
-    brand: deriveAtainBrand(name),
+  if (!spot || !campaignValue) return [];
+
+  const base = {
     spot,
-    campaign: String(campaign || pickRecordField(record, "campana", "campaign") || "").trim(),
+    campaign: campaignValue,
     price: 0,
     stock: 1,
     minStock: 1,
     purchasePrice: 0,
     image: "",
     tag: "Asignado",
-    comments: formatAtainComments({ ...record, hostname }),
   };
+
+  const assets = [];
+
+  if (modelo && !isMissingSerial(desktopSerial)) {
+    assets.push({
+      ...base,
+      name: modelo,
+      code: desktopSerial,
+      category: "Desktop",
+      brand: deriveAtainBrand(modelo),
+      comments: hostname ? `Hostname: ${hostname}` : "",
+    });
+  }
+
+  const spotNote = formatAtainSpotNote(spot, hostname);
+  const peripheralDefs = [
+    { fields: ["pantalla 1", "pantalla1"], name: "Pantalla 1", category: "Pantalla" },
+    { fields: ["pantalla 2", "pantalla2"], name: "Pantalla 2", category: "Pantalla" },
+    { fields: ["headset"], name: "Headset", category: "Headset" },
+    { fields: ["mouse"], name: "Mouse", category: "Mouse" },
+    { fields: ["teclado"], name: "Teclado", category: "Teclado" },
+  ];
+
+  for (const def of peripheralDefs) {
+    const serial = pickRecordField(record, ...def.fields);
+    if (isMissingSerial(serial)) continue;
+
+    assets.push({
+      ...base,
+      name: def.name,
+      code: serial,
+      category: def.category,
+      brand: "",
+      comments: spotNote,
+    });
+  }
+
+  return assets.filter(isValidAtainImportedProduct);
 }
 
 function isValidAtainImportedProduct(item) {
@@ -407,9 +427,7 @@ function isValidAtainImportedProduct(item) {
 
 export function parseAtainAssetCsv(text, campaign) {
   const { records } = parseCsvTable(text);
-  const mapped = records
-    .map((record) => mapAtainAssetRecord(record, campaign))
-    .filter((item) => isValidAtainImportedProduct(item));
+  const mapped = records.flatMap((record) => expandAtainRowToProducts(record, campaign));
 
   if (mapped.length) return mapped;
   return parseAtainAssetCsvPositional(text, campaign);
@@ -433,8 +451,7 @@ function parseAtainAssetCsvPositional(text, campaign) {
   return table
     .slice(startIndex)
     .filter((cells) => looksLikeAtainDataRow(cells))
-    .map((cells) => mapAtainAssetRecord(cellsToAtainRecord(cells), campaign))
-    .filter((item) => isValidAtainImportedProduct(item));
+    .flatMap((cells) => expandAtainRowToProducts(cellsToAtainRecord(cells), campaign));
 }
 
 export function describeAtainImportFailure(text) {

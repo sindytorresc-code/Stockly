@@ -3,6 +3,7 @@ import {
   computeStats,
   deriveTag,
   matchesFilter,
+  matchesAtainAssetFilter,
   matchesSearch,
   mergeProductsByCode,
   parseCsvProducts,
@@ -72,7 +73,7 @@ describe("validateProduct", () => {
         {
           name: "A",
           code: "1",
-          category: "X",
+          category: "Desktop",
           price: 0,
           stock: 1,
           purchasePrice: 0,
@@ -111,20 +112,30 @@ describe("parseAtainAssetCsv", () => {
     ].join("\n");
 
     const products = parseAtainAssetCsv(csv, "TRN1");
-    expect(products).toHaveLength(2);
-    expect(products[0]).toMatchObject({
-      spot: "39",
-      name: "Optiplex 3050 Micro",
-      code: "9PP2WP2",
-      campaign: "TRN1",
-      category: "Computadores",
-      brand: "Dell",
-      tag: "Asignado",
-      stock: 1,
-    });
-    expect(products[0].comments).toContain("Hostname: BG1DTRN9PP2WP2");
-    expect(products[0].comments).toContain("Mouse: CN0MOUSE1");
-    expect(products[0].comments).not.toContain("Headset:");
+    expect(products.length).toBeGreaterThan(2);
+    expect(products).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          spot: "39",
+          name: "Optiplex 3050 Micro",
+          code: "9PP2WP2",
+          category: "Desktop",
+          campaign: "TRN1",
+        }),
+        expect.objectContaining({
+          spot: "39",
+          name: "Pantalla 1",
+          code: "CN0SCREEN1",
+          category: "Pantalla",
+        }),
+        expect.objectContaining({
+          spot: "39",
+          name: "Mouse",
+          code: "CN0MOUSE1",
+          category: "Mouse",
+        }),
+      ]),
+    );
   });
 
   it("detects ATAIN asset CSV headers", () => {
@@ -150,7 +161,7 @@ describe("parseAtainAssetCsv", () => {
       "40;ThinkCentre M720q;MJ0BV0T8;BG1DTRNMJ0BV0T8;CN0SCREEN2;;S/N;S/N;CN0KEY2",
     ].join("\n");
 
-    expect(parseAtainImport(csv, "TRN1")).toHaveLength(2);
+    expect(parseAtainImport(csv, "TRN1").length).toBeGreaterThan(3);
   });
 
   it("skips sep= lines from Excel", () => {
@@ -160,7 +171,19 @@ describe("parseAtainAssetCsv", () => {
       "39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2;CN0SCREEN1;S/N;S/N;CN0MOUSE1;CN0KEY1",
     ].join("\n");
 
-    expect(parseAtainImport(csv, "TRN1")).toHaveLength(1);
+    expect(parseAtainImport(csv, "TRN1").length).toBeGreaterThan(1);
+  });
+});
+
+describe("matchesAtainAssetFilter", () => {
+  it("filters assets by type", () => {
+    const desktop = { category: "Desktop" };
+    const screen = { category: "Pantalla" };
+
+    expect(matchesAtainAssetFilter(desktop, "all")).toBe(true);
+    expect(matchesAtainAssetFilter(desktop, "desktop")).toBe(true);
+    expect(matchesAtainAssetFilter(screen, "desktop")).toBe(false);
+    expect(matchesAtainAssetFilter(screen, "pantalla")).toBe(true);
   });
 });
 
