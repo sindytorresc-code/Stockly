@@ -10,6 +10,7 @@ import {
   upsertSupabaseProduct,
   upsertSupabaseProducts,
 } from "../lib/supabase.js";
+import { formatSupabaseError } from "../lib/supabaseErrors.js";
 import { mergeProductsByCode } from "../lib/products.js";
 
 function initialProductsState() {
@@ -75,7 +76,7 @@ export function useInventorySync(showToast) {
       } catch (error) {
         console.error(error);
         setDataSource("Error Supabase");
-        showToast("No pude cargar datos desde Supabase");
+        showToast(formatSupabaseError(error, "No pude cargar datos desde Supabase"));
       } finally {
         setIsLoadingProducts(false);
       }

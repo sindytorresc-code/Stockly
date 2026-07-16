@@ -17,6 +17,7 @@ import {
   parseProductForm,
   validateProduct,
 } from "./lib/products.js";
+import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin, loadPins, savePins } from "./lib/storage.js";
 
@@ -188,7 +189,7 @@ export default function App() {
       showToast("Inventario actualizado");
     } catch (error) {
       console.error(error);
-      showToast("No pude guardar en Supabase");
+      showToast(formatSupabaseError(error, "No pude guardar en Supabase"));
     }
   }
 
@@ -200,7 +201,7 @@ export default function App() {
       showToast("Producto eliminado");
     } catch (error) {
       console.error(error);
-      showToast("No pude eliminar en Supabase");
+      showToast(formatSupabaseError(error, "No pude eliminar en Supabase"));
     }
   }
 
