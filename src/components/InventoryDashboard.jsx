@@ -65,7 +65,7 @@ export default function InventoryDashboard({
               </div>
               <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">
                 <Upload size={18} /> Cargar archivo
-                <input type="file" accept=".csv" className="hidden" onChange={onImport} />
+                <input type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={onImport} />
               </label>
               <button
                 type="button"

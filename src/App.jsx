@@ -4,6 +4,7 @@ import ClientSelector from "./components/ClientSelector.jsx";
 import ConfirmDialog from "./components/ui/ConfirmDialog.jsx";
 import InventoryDashboard from "./components/InventoryDashboard.jsx";
 import PasswordModal from "./components/PasswordModal.jsx";
+import AtainImportModal from "./components/AtainImportModal.jsx";
 import PinModal from "./components/PinModal.jsx";
 import ProductDrawer from "./components/ProductDrawer.jsx";
 import Toast from "./components/ui/Toast.jsx";
@@ -17,6 +18,7 @@ import {
   parseCsvProducts,
   parseProductForm,
   validateProduct,
+  isAtainAssetCsv,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
@@ -46,6 +48,7 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [atainImportDraft, setAtainImportDraft] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0].theme;
@@ -236,6 +239,33 @@ export default function App() {
     }
   }
 
+  async function importParsedProducts(imported) {
+    if (!imported.length) {
+      showToast("El archivo no tiene productos validos");
+      return;
+    }
+
+    const count = await importProducts(selectedBusiness, imported);
+    showToast(`${count} productos cargados`);
+  }
+
+  async function handleAtainImportConfirm(campaign) {
+    if (!atainImportDraft || !selectedBusiness) return;
+
+    try {
+      const imported = parseCsvProducts(atainImportDraft.text, {
+        businessId: "atain",
+        campaign,
+      });
+      await importParsedProducts(imported);
+    } catch (error) {
+      console.error(error);
+      showToast("No pude leer el archivo CSV");
+    } finally {
+      setAtainImportDraft(null);
+    }
+  }
+
   function handleImportCsv(event) {
     const file = event.target.files?.[0];
     if (!file || !selectedBusiness) return;
@@ -243,14 +273,15 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const imported = parseCsvProducts(reader.result);
-        if (!imported.length) {
-          showToast("El archivo no tiene productos validos");
+        const text = String(reader.result || "");
+
+        if (selectedBusiness.id === "atain" && isAtainAssetCsv(text)) {
+          setAtainImportDraft({ text, fileName: file.name });
           return;
         }
 
-        const count = await importProducts(selectedBusiness, imported);
-        showToast(`${count} productos cargados`);
+        const imported = parseCsvProducts(text, { businessId: selectedBusiness.id });
+        await importParsedProducts(imported);
       } catch (error) {
         console.error(error);
         showToast("No pude leer el archivo CSV");
@@ -344,6 +375,15 @@ export default function App() {
           theme={theme}
           onClose={() => setPasswordModalOpen(false)}
           onSubmit={handleChangePassword}
+        />
+      )}
+
+      {atainImportDraft && (
+        <AtainImportModal
+          theme={theme}
+          fileName={atainImportDraft.fileName}
+          onClose={() => setAtainImportDraft(null)}
+          onConfirm={handleAtainImportConfirm}
         />
       )}
 

@@ -6,6 +6,8 @@ import {
   matchesSearch,
   mergeProductsByCode,
   parseCsvProducts,
+  parseAtainAssetCsv,
+  isAtainAssetCsv,
   parseProductForm,
   validateProduct,
 } from "./products.js";
@@ -95,6 +97,37 @@ describe("parseProductForm", () => {
 
     const product = parseProductForm(form, null, false);
     expect(product.tag).toBe("Reparacion");
+  });
+});
+
+describe("parseAtainAssetCsv", () => {
+  it("parses ATAIN workstation rows with semicolon delimiter", () => {
+    const csv = [
+      "spot;modelo;serial;hostname;pantalla 1;pantalla 2;headset;mouse;teclado",
+      "39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2;CN0SCREEN1;S/N;S/N;CN0MOUSE1;CN0KEY1",
+      "40;ThinkCentre M720q;MJ0BV0T8;BG1DTRNMJ0BV0T8;CN0SCREEN2;;S/N;S/N;CN0KEY2",
+    ].join("\n");
+
+    const products = parseAtainAssetCsv(csv, "TRN1");
+    expect(products).toHaveLength(2);
+    expect(products[0]).toMatchObject({
+      spot: "39",
+      name: "Optiplex 3050 Micro",
+      code: "9PP2WP2",
+      campaign: "TRN1",
+      category: "Computadores",
+      brand: "Dell",
+      tag: "Asignado",
+      stock: 1,
+    });
+    expect(products[0].comments).toContain("Hostname: BG1DTRN9PP2WP2");
+    expect(products[0].comments).toContain("Mouse: CN0MOUSE1");
+    expect(products[0].comments).not.toContain("Headset:");
+  });
+
+  it("detects ATAIN asset CSV headers", () => {
+    expect(isAtainAssetCsv("spot,modelo,serial,hostname\n1,PC,ABC,HOST")).toBe(true);
+    expect(isAtainAssetCsv("name,code,category,price,stock\nA,1,X,10,1")).toBe(false);
   });
 });
 

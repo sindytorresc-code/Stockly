@@ -104,7 +104,32 @@ export function validateProduct(product, isAtain) {
   return null;
 }
 
-function splitCsvRow(row) {
+function normalizeCsvHeader(value) {
+  return String(value || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+function detectCsvDelimiter(firstLine) {
+  const candidates = [",", ";", "\t"];
+  let best = ",";
+  let bestCount = -1;
+
+  for (const delimiter of candidates) {
+    const count = splitDelimitedRow(firstLine, delimiter).length;
+    if (count > bestCount) {
+      bestCount = count;
+      best = delimiter;
+    }
+  }
+
+  return best;
+}
+
+function splitDelimitedRow(row, delimiter = ",") {
   const cells = [];
   let current = "";
   let inQuotes = false;
@@ -123,7 +148,7 @@ function splitCsvRow(row) {
       continue;
     }
 
-    if (char === "," && !inQuotes) {
+    if (char === delimiter && !inQuotes) {
       cells.push(current.trim());
       current = "";
       continue;
@@ -136,8 +161,119 @@ function splitCsvRow(row) {
   return cells;
 }
 
-export function parseCsvProducts(text) {
-  const rows = String(text).split(/\r?\n/).filter(Boolean);
+function splitCsvRow(row, delimiter = ",") {
+  return splitDelimitedRow(row, delimiter);
+}
+
+function parseCsvTable(text) {
+  const normalizedText = String(text).replace(/^\uFEFF/, "");
+  const rows = normalizedText.split(/\r?\n/).filter((row) => row.trim());
+  if (!rows.length) return { headers: [], records: [], delimiter: "," };
+
+  const delimiter = detectCsvDelimiter(rows[0]);
+  const headers = splitCsvRow(rows[0], delimiter).map(normalizeCsvHeader);
+  const records = rows.slice(1).map((row) => {
+    const cells = splitCsvRow(row, delimiter);
+    return Object.fromEntries(headers.map((header, index) => [header, cells[index] || ""]));
+  });
+
+  return { headers, records, delimiter };
+}
+
+export function isAtainAssetCsv(text) {
+  const { headers } = parseCsvTable(text);
+  const headerSet = new Set(headers);
+  return headerSet.has("spot") && headerSet.has("modelo") && headerSet.has("serial");
+}
+
+function deriveAtainCategory(modelo) {
+  const value = String(modelo || "").toLowerCase();
+  if (value.includes("optiplex") || value.includes("thinkcentre") || value.includes("latitude")) {
+    return "Computadores";
+  }
+  if (value.includes("monitor") || value.includes("pantalla")) return "Pantallas";
+  return "Equipos";
+}
+
+function deriveAtainBrand(modelo) {
+  const value = String(modelo || "").toLowerCase();
+  if (value.includes("optiplex") || value.includes("latitude")) return "Dell";
+  if (value.includes("thinkcentre")) return "Lenovo";
+  return "";
+}
+
+function isMissingSerial(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return !normalized || normalized === "S/N" || normalized === "SN" || normalized === "N/A";
+}
+
+function formatAtainComments(record) {
+  const parts = [];
+  const hostname = String(record.hostname || "").trim();
+  if (hostname) parts.push(`Hostname: ${hostname}`);
+
+  const peripherals = [
+    ["Pantalla 1", record["pantalla 1"]],
+    ["Pantalla 2", record["pantalla 2"]],
+    ["Headset", record.headset],
+    ["Mouse", record.mouse],
+    ["Teclado", record.teclado],
+  ];
+
+  for (const [label, value] of peripherals) {
+    const serial = String(value || "").trim();
+    if (!isMissingSerial(serial)) parts.push(`${label}: ${serial}`);
+  }
+
+  return parts.join(" | ");
+}
+
+function mapAtainAssetRecord(record, campaign) {
+  const spot = String(record.spot || "").trim();
+  const name = String(record.modelo || "").trim();
+  const code = String(record.serial || "").trim();
+
+  return {
+    name,
+    code,
+    category: deriveAtainCategory(name),
+    brand: deriveAtainBrand(name),
+    spot,
+    campaign: String(campaign || record.campana || record.campaign || "").trim(),
+    price: 0,
+    stock: 1,
+    minStock: 1,
+    purchasePrice: 0,
+    image: "",
+    tag: "Asignado",
+    comments: formatAtainComments(record),
+  };
+}
+
+function isValidAtainImportedProduct(item) {
+  if (!item.name || !item.code || !item.spot || !item.campaign) return false;
+  if (!item.category) return false;
+  if (Number.isNaN(item.price) || item.price < 0) return false;
+  if (!Number.isInteger(item.stock) || item.stock < 0) return false;
+  if (Number.isNaN(item.minStock) || item.minStock < 0) return false;
+  if (Number.isNaN(item.purchasePrice) || item.purchasePrice < 0) return false;
+  return true;
+}
+
+export function parseAtainAssetCsv(text, campaign) {
+  const { records } = parseCsvTable(text);
+  return records
+    .map((record) => mapAtainAssetRecord(record, campaign))
+    .filter((item) => isValidAtainImportedProduct(item));
+}
+
+export function parseCsvProducts(text, options = {}) {
+  if (options.businessId === "atain" && isAtainAssetCsv(text)) {
+    return parseAtainAssetCsv(text, options.campaign);
+  }
+
+  const { delimiter } = parseCsvTable(text);
+  const rows = String(text).replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean);
   return rows.slice(1).map((row) => {
     const [
       name,
@@ -153,7 +289,7 @@ export function parseCsvProducts(text) {
       image,
       spot,
       campaign,
-    ] = splitCsvRow(row);
+    ] = splitCsvRow(row, delimiter);
     const parsedStock = Number(stock);
 
     return {
