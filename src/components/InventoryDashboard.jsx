@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ClipboardCheck,
   Database,
   DollarSign,
   Package,
@@ -87,9 +88,14 @@ export default function InventoryDashboard({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8">
-        <section className="grid gap-4 md:grid-cols-4">
-          <StatCard theme={theme} icon={Package} value={stats.total} label="Productos" />
-          <StatCard theme={theme} icon={DollarSign} value={money.format(stats.value)} label="Valor total" />
+        <section className={`grid gap-4 ${isAtain ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
+          <StatCard theme={theme} icon={Package} value={stats.total} label={isAtain ? "Activos" : "Productos"} />
+          {!isAtain && (
+            <StatCard theme={theme} icon={DollarSign} value={money.format(stats.value)} label="Valor total" />
+          )}
+          {isAtain && (
+            <StatCard theme={theme} icon={ClipboardCheck} value={stats.assigned ?? 0} label="Asignados" />
+          )}
           <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
           <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
         </section>

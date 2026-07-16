@@ -6,6 +6,7 @@ import {
   matchesSearch,
   mergeProductsByCode,
   parseCsvProducts,
+  decodeCsvText,
   parseAtainAssetCsv,
   isAtainAssetCsv,
   parseProductForm,
@@ -129,6 +130,28 @@ describe("parseAtainAssetCsv", () => {
     expect(isAtainAssetCsv("spot,modelo,serial,hostname\n1,PC,ABC,HOST")).toBe(true);
     expect(isAtainAssetCsv("name,code,category,price,stock\nA,1,X,10,1")).toBe(false);
   });
+
+  it("parses UTF-16 CSV exports from Excel on Windows", () => {
+    const csv = "spot;modelo;serial;hostname\n39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2";
+    const asciiBytes = Array.from(new TextEncoder().encode(csv));
+    const utf16Body = asciiBytes.flatMap((byte) => [byte, 0]);
+    const utf16 = new Uint8Array([0xff, 0xfe, ...utf16Body]);
+    const text = decodeCsvText(utf16.buffer);
+
+    expect(isAtainAssetCsv(text)).toBe(true);
+    expect(parseAtainAssetCsv(text, "TRN1")).toHaveLength(1);
+  });
+
+  it("finds ATAIN headers even when they are not on the first row", () => {
+    const csv = [
+      "Inventario campana TRN1",
+      "",
+      "spot,modelo,serial,hostname,pantalla 1,pantalla 2,headset,mouse,teclado",
+      "39,Optiplex 3050 Micro,9PP2WP2,BG1DTRN9PP2WP2,CN0SCREEN1,S/N,S/N,CN0MOUSE1,CN0KEY1",
+    ].join("\n");
+
+    expect(parseAtainAssetCsv(csv, "TRN1")).toHaveLength(1);
+  });
 });
 
 describe("parseCsvProducts", () => {
@@ -166,5 +189,17 @@ describe("computeStats", () => {
     expect(stats.empty).toBe(1);
     expect(stats.low).toBe(1);
     expect(stats.value).toBe(3000);
+  });
+
+  it("counts assigned assets for ATAIN", () => {
+    const stats = computeStats(
+      [
+        { price: 0, stock: 1, minStock: 1, tag: "Asignado" },
+        { price: 0, stock: 1, minStock: 1, tag: "En stock" },
+      ],
+      { isAtain: true },
+    );
+
+    expect(stats.assigned).toBe(1);
   });
 });

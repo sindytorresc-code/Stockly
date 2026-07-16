@@ -40,8 +40,8 @@ export function matchesFilter(product, filter) {
   return true;
 }
 
-export function computeStats(products) {
-  return {
+export function computeStats(products, { isAtain = false } = {}) {
+  const stats = {
     total: products.length,
     value: products.reduce((sum, product) => sum + product.price * product.stock, 0),
     low: products.filter(
@@ -49,6 +49,12 @@ export function computeStats(products) {
     ).length,
     empty: products.filter((product) => product.stock === 0).length,
   };
+
+  if (isAtain) {
+    stats.assigned = products.filter((product) => product.tag === "Asignado").length;
+  }
+
+  return stats;
 }
 
 export function mergeProductsByCode(existing, incoming) {
@@ -106,11 +112,29 @@ export function validateProduct(product, isAtain) {
 
 function normalizeCsvHeader(value) {
   return String(value || "")
+    .replace(/\0/g, "")
     .replace(/^\uFEFF/, "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
+}
+
+export function decodeCsvText(input) {
+  if (typeof input === "string") {
+    return input.replace(/^\uFEFF/, "").replace(/\0/g, "");
+  }
+
+  const bytes = new Uint8Array(input);
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder("utf-16le").decode(input).replace(/\0/g, "");
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder("utf-16be").decode(input).replace(/\0/g, "");
+  }
+
+  return new TextDecoder("utf-8").decode(input).replace(/^\uFEFF/, "").replace(/\0/g, "");
 }
 
 function detectCsvDelimiter(firstLine) {
@@ -126,7 +150,7 @@ function detectCsvDelimiter(firstLine) {
     }
   }
 
-  return best;
+  return bestCount > 1 ? best : ",";
 }
 
 function splitDelimitedRow(row, delimiter = ",") {
@@ -165,14 +189,35 @@ function splitCsvRow(row, delimiter = ",") {
   return splitDelimitedRow(row, delimiter);
 }
 
+function rowLooksLikeAtainHeaders(headers) {
+  const headerSet = new Set(headers.map(normalizeCsvHeader));
+  const hasSpot = headerSet.has("spot");
+  const hasModel = headerSet.has("modelo") || headerSet.has("model");
+  const hasSerial = headerSet.has("serial") || headerSet.has("serie");
+  return hasSpot && hasModel && hasSerial;
+}
+
+function findAtainTableStart(rows) {
+  for (let index = 0; index < Math.min(rows.length, 15); index += 1) {
+    const delimiter = detectCsvDelimiter(rows[index]);
+    const headers = splitCsvRow(rows[index], delimiter).map(normalizeCsvHeader);
+    if (rowLooksLikeAtainHeaders(headers)) {
+      return { headerIndex: index, delimiter, headers };
+    }
+  }
+  return null;
+}
+
 function parseCsvTable(text) {
-  const normalizedText = String(text).replace(/^\uFEFF/, "");
-  const rows = normalizedText.split(/\r?\n/).filter((row) => row.trim());
+  const normalizedText = decodeCsvText(text);
+  const rows = normalizedText.split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
   if (!rows.length) return { headers: [], records: [], delimiter: "," };
 
-  const delimiter = detectCsvDelimiter(rows[0]);
-  const headers = splitCsvRow(rows[0], delimiter).map(normalizeCsvHeader);
-  const records = rows.slice(1).map((row) => {
+  const atainStart = findAtainTableStart(rows);
+  const headerIndex = atainStart?.headerIndex ?? 0;
+  const delimiter = atainStart?.delimiter ?? detectCsvDelimiter(rows[headerIndex]);
+  const headers = (atainStart?.headers ?? splitCsvRow(rows[headerIndex], delimiter)).map(normalizeCsvHeader);
+  const records = rows.slice(headerIndex + 1).map((row) => {
     const cells = splitCsvRow(row, delimiter);
     return Object.fromEntries(headers.map((header, index) => [header, cells[index] || ""]));
   });
@@ -181,9 +226,18 @@ function parseCsvTable(text) {
 }
 
 export function isAtainAssetCsv(text) {
-  const { headers } = parseCsvTable(text);
-  const headerSet = new Set(headers);
-  return headerSet.has("spot") && headerSet.has("modelo") && headerSet.has("serial");
+  const normalizedText = decodeCsvText(text);
+  const rows = normalizedText.split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
+  return Boolean(findAtainTableStart(rows));
+}
+
+function pickRecordField(record, ...aliases) {
+  for (const alias of aliases) {
+    const key = normalizeCsvHeader(alias);
+    const value = String(record[key] || "").trim();
+    if (value) return value;
+  }
+  return "";
 }
 
 function deriveAtainCategory(modelo) {
@@ -213,11 +267,11 @@ function formatAtainComments(record) {
   if (hostname) parts.push(`Hostname: ${hostname}`);
 
   const peripherals = [
-    ["Pantalla 1", record["pantalla 1"]],
-    ["Pantalla 2", record["pantalla 2"]],
-    ["Headset", record.headset],
-    ["Mouse", record.mouse],
-    ["Teclado", record.teclado],
+    ["Pantalla 1", pickRecordField(record, "pantalla 1", "pantalla1")],
+    ["Pantalla 2", pickRecordField(record, "pantalla 2", "pantalla2")],
+    ["Headset", pickRecordField(record, "headset")],
+    ["Mouse", pickRecordField(record, "mouse")],
+    ["Teclado", pickRecordField(record, "teclado")],
   ];
 
   for (const [label, value] of peripherals) {
@@ -229,9 +283,10 @@ function formatAtainComments(record) {
 }
 
 function mapAtainAssetRecord(record, campaign) {
-  const spot = String(record.spot || "").trim();
-  const name = String(record.modelo || "").trim();
-  const code = String(record.serial || "").trim();
+  const spot = pickRecordField(record, "spot");
+  const name = pickRecordField(record, "modelo", "model");
+  const code = pickRecordField(record, "serial", "serie");
+  const hostname = pickRecordField(record, "hostname", "host");
 
   return {
     name,
@@ -239,14 +294,14 @@ function mapAtainAssetRecord(record, campaign) {
     category: deriveAtainCategory(name),
     brand: deriveAtainBrand(name),
     spot,
-    campaign: String(campaign || record.campana || record.campaign || "").trim(),
+    campaign: String(campaign || pickRecordField(record, "campana", "campaign") || "").trim(),
     price: 0,
     stock: 1,
     minStock: 1,
     purchasePrice: 0,
     image: "",
     tag: "Asignado",
-    comments: formatAtainComments(record),
+    comments: formatAtainComments({ ...record, hostname }),
   };
 }
 
@@ -267,13 +322,20 @@ export function parseAtainAssetCsv(text, campaign) {
     .filter((item) => isValidAtainImportedProduct(item));
 }
 
+export function parseAtainImport(text, campaign) {
+  if (isAtainAssetCsv(text)) {
+    return parseAtainAssetCsv(text, campaign);
+  }
+  return parseCsvProducts(text);
+}
+
 export function parseCsvProducts(text, options = {}) {
   if (options.businessId === "atain" && isAtainAssetCsv(text)) {
     return parseAtainAssetCsv(text, options.campaign);
   }
 
   const { delimiter } = parseCsvTable(text);
-  const rows = String(text).replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean);
+  const rows = decodeCsvText(text).split(/\r?\n/).filter(Boolean);
   return rows.slice(1).map((row) => {
     const [
       name,

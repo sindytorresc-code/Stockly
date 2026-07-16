@@ -15,10 +15,11 @@ import {
   computeStats,
   matchesFilter,
   matchesSearch,
+  decodeCsvText,
+  parseAtainImport,
   parseCsvProducts,
   parseProductForm,
   validateProduct,
-  isAtainAssetCsv,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
@@ -62,7 +63,10 @@ export default function App() {
     [products, query, filter],
   );
 
-  const stats = useMemo(() => computeStats(products), [products]);
+  const stats = useMemo(
+    () => computeStats(products, { isAtain: selectedBusiness?.id === "atain" }),
+    [products, selectedBusiness],
+  );
 
   const resetSessionFilters = useCallback(() => {
     setFilter("all");
@@ -239,9 +243,9 @@ export default function App() {
     }
   }
 
-  async function importParsedProducts(imported) {
+  async function importParsedProducts(imported, emptyMessage = "El archivo no tiene productos validos") {
     if (!imported.length) {
-      showToast("El archivo no tiene productos validos");
+      showToast(emptyMessage);
       return;
     }
 
@@ -253,11 +257,11 @@ export default function App() {
     if (!atainImportDraft || !selectedBusiness) return;
 
     try {
-      const imported = parseCsvProducts(atainImportDraft.text, {
-        businessId: "atain",
-        campaign,
-      });
-      await importParsedProducts(imported);
+      const imported = parseAtainImport(atainImportDraft.text, campaign);
+      await importParsedProducts(
+        imported,
+        "El archivo no tiene activos validos. Revisa que tenga columnas spot, modelo y serial.",
+      );
     } catch (error) {
       console.error(error);
       showToast("No pude leer el archivo CSV");
@@ -273,9 +277,9 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const text = String(reader.result || "");
+        const text = decodeCsvText(reader.result);
 
-        if (selectedBusiness.id === "atain" && isAtainAssetCsv(text)) {
+        if (selectedBusiness.id === "atain") {
           setAtainImportDraft({ text, fileName: file.name });
           return;
         }
@@ -289,7 +293,7 @@ export default function App() {
         event.target.value = "";
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
 
   async function handleChangePassword(event) {
