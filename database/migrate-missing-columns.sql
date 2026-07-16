@@ -1,6 +1,8 @@
 -- Ejecuta esto en Supabase > SQL Editor si guardar productos falla
 -- con errores como: Could not find the 'campaign' column of 'products'
 
+alter table clients add column if not exists pin_hash text;
+
 alter table products add column if not exists purchase_price numeric(12, 2) not null default 0;
 alter table products add column if not exists min_stock integer not null default 3;
 alter table products add column if not exists brand text not null default '';

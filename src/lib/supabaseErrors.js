@@ -5,6 +5,9 @@ export function formatSupabaseError(error, fallback = "No pude conectar con Supa
     const message = parsed.message || raw;
 
     if (/Could not find the '([^']+)' column/.test(message)) {
+      if (message.includes("pin_hash")) {
+        return "Falta la columna pin_hash en clients. Ejecuta database/migrate-missing-columns.sql en Supabase.";
+      }
       return "La base de datos necesita actualizarse. Ejecuta database/migrate-missing-columns.sql en Supabase.";
     }
     if (/row-level security|RLS|permission denied/i.test(message)) {

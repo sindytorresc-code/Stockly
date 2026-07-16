@@ -1,7 +1,7 @@
 import { Delete, X } from "lucide-react";
 import { iconMap } from "../lib/icons.js";
 
-export default function PinModal({ business, pin, error, onClose, onKey }) {
+export default function PinModal({ business, pin, error, loading, onClose, onKey }) {
   const Icon = iconMap[business.icon];
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "backspace"];
 
@@ -47,6 +47,9 @@ export default function PinModal({ business, pin, error, onClose, onKey }) {
           </div>
         </div>
         <p className="min-h-8 pt-3 text-center text-xs font-extrabold text-red-600">{error}</p>
+        {loading ? (
+          <p className="pb-7 text-center text-sm font-semibold text-slate-500">Cargando clave...</p>
+        ) : (
         <div className="grid grid-cols-3 gap-x-5 gap-y-3 px-5 pb-7">
           {keys.map((key, index) =>
             key ? (
@@ -64,6 +67,7 @@ export default function PinModal({ business, pin, error, onClose, onKey }) {
             ),
           )}
         </div>
+        )}
       </section>
     </div>
   );

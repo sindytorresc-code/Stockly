@@ -65,11 +65,21 @@ export async function fetchSupabasePins() {
 }
 
 export async function updateSupabasePin(slug, pin) {
-  await supabaseRequest(`/clients?slug=eq.${encodeURIComponent(slug)}`, {
+  const rows = await supabaseRequest(`/clients?slug=eq.${encodeURIComponent(slug)}`, {
     method: "PATCH",
-    headers: { Prefer: "return=minimal" },
+    headers: { Prefer: "return=representation" },
     body: JSON.stringify({ pin_hash: pin }),
   });
+
+  if (!rows?.length) {
+    throw new Error(`No se encontro el cliente ${slug} en Supabase`);
+  }
+
+  if (rows[0].pin_hash !== pin) {
+    throw new Error("Supabase no guardo la clave. Verifica la columna pin_hash en clients.");
+  }
+
+  return rows[0].pin_hash;
 }
 
 export async function syncSupabasePins(defaultPinsBySlug) {

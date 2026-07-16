@@ -8,6 +8,7 @@ import PinModal from "./components/PinModal.jsx";
 import ProductDrawer from "./components/ProductDrawer.jsx";
 import Toast from "./components/ui/Toast.jsx";
 import { useInventorySync } from "./hooks/useInventorySync.js";
+import { usePinSync } from "./hooks/usePinSync.js";
 import { useToast } from "./hooks/useToast.js";
 import {
   computeStats,
@@ -18,9 +19,8 @@ import {
   validateProduct,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
-import { hasSupabaseConfig, syncSupabasePins, updateSupabasePin } from "./lib/supabase.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
-import { getBusinessPin, loadPins, savePins } from "./lib/storage.js";
+import { getBusinessPin } from "./lib/storage.js";
 
 export default function App() {
   const initialRouteBusiness = businessFromPath();
@@ -34,9 +34,11 @@ export default function App() {
     deleteProduct,
     importProducts,
   } = useInventorySync(showToast);
+  const { pinsByBusiness, pinsReady, savePin, refreshPinForBusiness } = usePinSync(showToast);
 
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [pinBusiness, setPinBusiness] = useState(initialRouteBusiness);
+  const [pinLoading, setPinLoading] = useState(Boolean(initialRouteBusiness));
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
   const [query, setQuery] = useState("");
@@ -44,7 +46,6 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [pinsByBusiness, setPinsByBusiness] = useState(loadPins);
   const [productToDelete, setProductToDelete] = useState(null);
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0].theme;
@@ -59,10 +60,6 @@ export default function App() {
   );
 
   const stats = useMemo(() => computeStats(products), [products]);
-  const defaultPinsByBusiness = useMemo(
-    () => Object.fromEntries(businesses.map((business) => [business.id, business.pin])),
-    [],
-  );
 
   const resetSessionFilters = useCallback(() => {
     setFilter("all");
@@ -70,13 +67,22 @@ export default function App() {
   }, []);
 
   const openPin = useCallback(
-    (business) => {
+    async (business) => {
       navigateToPath(businessPath(business));
       setPinBusiness(business);
       setPin("");
       setPinError("");
+      setPinLoading(true);
+      try {
+        await refreshPinForBusiness(business.id);
+      } catch (error) {
+        console.error(error);
+        showToast(formatSupabaseError(error, "No pude cargar la clave"));
+      } finally {
+        setPinLoading(false);
+      }
     },
-    [],
+    [refreshPinForBusiness, showToast],
   );
 
   const closePin = useCallback(() => {
@@ -99,6 +105,8 @@ export default function App() {
     (key) => {
       if (!pinBusiness) return;
 
+      if (!pinsReady || pinLoading) return;
+
       const nextPin = key === "backspace" ? pin.slice(0, -1) : `${pin}${key}`.slice(0, 4);
       setPin(nextPin);
 
@@ -116,7 +124,7 @@ export default function App() {
       setPinError("Codigo incorrecto");
       setPin("");
     },
-    [pin, pinBusiness, pinsByBusiness, resetSessionFilters],
+    [pin, pinBusiness, pinsByBusiness, pinsReady, pinLoading, resetSessionFilters],
   );
 
   useEffect(() => {
@@ -138,15 +146,12 @@ export default function App() {
   }, [selectedBusiness, loadInventory]);
 
   useEffect(() => {
-    if (!hasSupabaseConfig) return;
+    if (!initialRouteBusiness) return;
 
-    syncSupabasePins(defaultPinsByBusiness)
-      .then((merged) => {
-        setPinsByBusiness(merged);
-        savePins(merged);
-      })
-      .catch((error) => console.error("No pude sincronizar claves desde Supabase", error));
-  }, [defaultPinsByBusiness]);
+    refreshPinForBusiness(initialRouteBusiness.id)
+      .catch((error) => console.error(error))
+      .finally(() => setPinLoading(false));
+  }, [initialRouteBusiness, refreshPinForBusiness]);
 
   useEffect(() => {
     if (!pinBusiness) return undefined;
@@ -268,16 +273,9 @@ export default function App() {
     }
 
     try {
-      const nextPins = { ...pinsByBusiness, [selectedBusiness.id]: newPin };
-      setPinsByBusiness(nextPins);
-      savePins(nextPins);
-
-      if (hasSupabaseConfig) {
-        await updateSupabasePin(selectedBusiness.id, newPin);
-      }
-
+      await savePin(selectedBusiness.id, newPin);
       setPasswordModalOpen(false);
-      showToast("Clave actualizada");
+      showToast("Clave actualizada en Supabase");
     } catch (error) {
       console.error(error);
       showToast(formatSupabaseError(error, "No pude guardar la clave en Supabase"));
@@ -314,6 +312,7 @@ export default function App() {
           business={pinBusiness}
           pin={pin}
           error={pinError}
+          loading={!pinsReady || pinLoading}
           onClose={closePin}
           onKey={pressPinKey}
         />
