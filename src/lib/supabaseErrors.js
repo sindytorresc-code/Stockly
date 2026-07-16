@@ -13,6 +13,9 @@ export function formatSupabaseError(error, fallback = "No pude conectar con Supa
     if (/row-level security|RLS|permission denied/i.test(message)) {
       return "Supabase bloqueo la operacion. Ejecuta database/public-demo-policies.sql en Supabase.";
     }
+    if (/payload too large|request entity too large|413/i.test(message)) {
+      return "Hay demasiados activos en un solo archivo. Intenta importar por partes.";
+    }
 
     return message;
   } catch {

@@ -145,6 +145,20 @@ export async function upsertSupabaseProducts(clientId, products) {
   });
 }
 
+const IMPORT_BATCH_SIZE = 25;
+
+export async function upsertSupabaseProductsInBatches(clientId, products) {
+  const synced = [];
+
+  for (let index = 0; index < products.length; index += IMPORT_BATCH_SIZE) {
+    const chunk = products.slice(index, index + IMPORT_BATCH_SIZE);
+    const rows = await upsertSupabaseProducts(clientId, chunk);
+    if (rows?.length) synced.push(...rows.map(dbProductToApp));
+  }
+
+  return synced;
+}
+
 export async function upsertSupabaseProduct(clientId, product) {
   const rows = await supabaseRequest("/products?on_conflict=client_id,code", {
     method: "POST",

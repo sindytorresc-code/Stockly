@@ -18,6 +18,7 @@ import {
   matchesSearch,
   decodeCsvText,
   describeAtainImportFailure,
+  isExcelWorkbook,
   parseAtainImport,
   parseCsvProducts,
   parseProductForm,
@@ -261,15 +262,17 @@ export default function App() {
 
     try {
       const imported = parseAtainImport(atainImportDraft.text, campaign);
-      await importParsedProducts(
-        imported,
-        describeAtainImportFailure(atainImportDraft.text),
-      );
+      if (!imported.length) {
+        showToast(describeAtainImportFailure(atainImportDraft.text));
+        return;
+      }
+
+      const count = await importProducts(selectedBusiness, imported);
+      setAtainImportDraft(null);
+      showToast(`${count} activos cargados`);
     } catch (error) {
       console.error(error);
-      showToast("No pude leer el archivo CSV");
-    } finally {
-      setAtainImportDraft(null);
+      showToast(formatSupabaseError(error, "No pude guardar los activos. Revisa la conexion con Supabase."));
     }
   }
 
@@ -277,10 +280,30 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file || !selectedBusiness) return;
 
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+      showToast("Exporta el Excel como CSV: Archivo → Guardar como → CSV UTF-8");
+      event.target.value = "";
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      showToast("No pude abrir el archivo seleccionado");
+      event.target.value = "";
+    };
     reader.onload = async () => {
       try {
+        if (isExcelWorkbook(reader.result)) {
+          showToast("Ese archivo es Excel (.xlsx). Exportalo primero como CSV UTF-8.");
+          return;
+        }
+
         const text = decodeCsvText(reader.result);
+        if (!text.trim()) {
+          showToast("El archivo esta vacio");
+          return;
+        }
 
         if (selectedBusiness.id === "atain") {
           setAtainImportDraft({ text, fileName: file.name });
@@ -291,7 +314,7 @@ export default function App() {
         await importParsedProducts(imported);
       } catch (error) {
         console.error(error);
-        showToast("No pude leer el archivo CSV");
+        showToast(formatSupabaseError(error, "No pude procesar el archivo CSV"));
       } finally {
         event.target.value = "";
       }

@@ -2,14 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { defaultProducts } from "../data/businesses.js";
 import { loadProducts, saveProducts } from "../lib/storage.js";
 import {
-  dbProductToApp,
   deleteSupabaseProduct,
   ensureSupabaseClient,
   initSupabase,
   isSupabaseConfigured,
   seedSupabaseProductsIfEmpty,
   upsertSupabaseProduct,
-  upsertSupabaseProducts,
+  upsertSupabaseProductsInBatches,
 } from "../lib/supabase.js";
 import { formatSupabaseError } from "../lib/supabaseErrors.js";
 import { mergeProductsByCode } from "../lib/products.js";
@@ -135,8 +134,8 @@ export function useInventorySync(showToast) {
     async (business, imported) => {
       if ((await canUseSupabase()) && imported.length) {
         const clientId = await getClientIdForBusiness(business);
-        const rows = await upsertSupabaseProducts(clientId, imported);
-        const synced = rows?.map(dbProductToApp) || imported;
+        const rows = await upsertSupabaseProductsInBatches(clientId, imported);
+        const synced = rows.length ? rows : imported;
         updateBusinessProducts(business.id, (currentProducts) => mergeProductsByCode(currentProducts, synced));
         setDataSource("Supabase");
         return imported.length;

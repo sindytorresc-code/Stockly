@@ -121,14 +121,26 @@ export function validateProduct(product, isAtain) {
 }
 
 function normalizeCsvHeader(value) {
-  return String(value || "")
+  const cleaned = String(value || "")
     .replace(/\0/g, "")
     .replace(/^\uFEFF/, "")
     .trim()
     .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ");
+
+  try {
+    return cleaned.normalize("NFD").replace(/\p{M}/gu, "");
+  } catch {
+    return cleaned;
+  }
+}
+
+export function isExcelWorkbook(input) {
+  if (typeof input === "string") return false;
+  const bytes = new Uint8Array(input);
+  return bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b;
 }
 
 function cleanCsvText(text) {
@@ -468,9 +480,14 @@ export function describeAtainImportFailure(text) {
 }
 
 export function parseAtainImport(text, campaign) {
-  const imported = parseAtainAssetCsv(text, campaign);
-  if (imported.length) return imported;
-  return parseAtainAssetCsvPositional(text, campaign);
+  try {
+    const imported = parseAtainAssetCsv(text, campaign);
+    if (imported.length) return imported;
+    return parseAtainAssetCsvPositional(text, campaign);
+  } catch (error) {
+    console.error("Error al interpretar CSV ATAIN", error);
+    return [];
+  }
 }
 
 export function parseCsvProducts(text, options = {}) {
