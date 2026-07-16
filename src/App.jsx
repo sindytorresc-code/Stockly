@@ -261,7 +261,7 @@ export default function App() {
     if (!atainImportDraft || !selectedBusiness) return;
 
     try {
-      const imported = parseAtainImport(atainImportDraft.text, campaign);
+      const { products: imported, duplicateCount } = parseAtainImport(atainImportDraft.text, campaign);
       if (!imported.length) {
         showToast(describeAtainImportFailure(atainImportDraft.text));
         return;
@@ -269,7 +269,11 @@ export default function App() {
 
       const count = await importProducts(selectedBusiness, imported);
       setAtainImportDraft(null);
-      showToast(`${count} activos cargados`);
+      showToast(
+        duplicateCount
+          ? `${count} activos cargados (${duplicateCount} seriales duplicados ajustados)`
+          : `${count} activos cargados`,
+      );
     } catch (error) {
       console.error(error);
       showToast(formatSupabaseError(error, "No pude guardar los activos. Revisa la conexion con Supabase."));

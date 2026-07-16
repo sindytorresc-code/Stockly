@@ -11,6 +11,7 @@ import {
   isAtainAssetCsv,
   parseAtainAssetCsv,
   parseAtainImport,
+  dedupeImportProductsByCode,
   parseProductForm,
   validateProduct,
 } from "./products.js";
@@ -161,7 +162,7 @@ describe("parseAtainAssetCsv", () => {
       "40;ThinkCentre M720q;MJ0BV0T8;BG1DTRNMJ0BV0T8;CN0SCREEN2;;S/N;S/N;CN0KEY2",
     ].join("\n");
 
-    expect(parseAtainImport(csv, "TRN1").length).toBeGreaterThan(3);
+    expect(parseAtainImport(csv, "TRN1").products.length).toBeGreaterThan(3);
   });
 
   it("skips sep= lines from Excel", () => {
@@ -171,7 +172,33 @@ describe("parseAtainAssetCsv", () => {
       "39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2;CN0SCREEN1;S/N;S/N;CN0MOUSE1;CN0KEY1",
     ].join("\n");
 
-    expect(parseAtainImport(csv, "TRN1").length).toBeGreaterThan(1);
+    expect(parseAtainImport(csv, "TRN1").products.length).toBeGreaterThan(1);
+  });
+});
+
+describe("dedupeImportProductsByCode", () => {
+  it("assigns unique codes when the same serial appears more than once", () => {
+    const base = {
+      spot: "39",
+      campaign: "BLUELINK",
+      category: "Mouse",
+      name: "Mouse",
+      price: 0,
+      stock: 1,
+      minStock: 1,
+      purchasePrice: 0,
+      tag: "Asignado",
+    };
+
+    const { products, duplicateCount } = dedupeImportProductsByCode([
+      { ...base, code: "ABC123" },
+      { ...base, spot: "40", code: "ABC123" },
+    ]);
+
+    expect(products).toHaveLength(2);
+    expect(products[0].code).toBe("ABC123");
+    expect(products[1].code).toBe("40-Mouse-ABC123");
+    expect(duplicateCount).toBeGreaterThan(0);
   });
 });
 

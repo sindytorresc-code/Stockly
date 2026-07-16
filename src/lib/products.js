@@ -71,6 +71,36 @@ export function mergeProductsByCode(existing, incoming) {
   return Array.from(byCode.values());
 }
 
+export function dedupeImportProductsByCode(products) {
+  const used = new Set();
+  const deduped = [];
+  let duplicateCount = 0;
+
+  for (const product of products) {
+    const baseCode = String(product.code || "").trim();
+    if (!baseCode) continue;
+
+    let code = baseCode;
+    if (used.has(code)) {
+      duplicateCount += 1;
+      code = `${product.spot}-${product.category}-${baseCode}`;
+    }
+
+    let finalCode = code;
+    let suffix = 2;
+    while (used.has(finalCode)) {
+      duplicateCount += 1;
+      finalCode = `${code}-${suffix}`;
+      suffix += 1;
+    }
+
+    used.add(finalCode);
+    deduped.push(finalCode === baseCode ? product : { ...product, code: finalCode });
+  }
+
+  return { products: deduped, duplicateCount };
+}
+
 export function parseProductForm(form, editingProduct, isAtain) {
   const userTag = String(form.get("tag") || editingProduct?.tag || "En stock");
   const stock = Number(form.get("stock"));
@@ -482,11 +512,11 @@ export function describeAtainImportFailure(text) {
 export function parseAtainImport(text, campaign) {
   try {
     const imported = parseAtainAssetCsv(text, campaign);
-    if (imported.length) return imported;
-    return parseAtainAssetCsvPositional(text, campaign);
+    const parsed = imported.length ? imported : parseAtainAssetCsvPositional(text, campaign);
+    return dedupeImportProductsByCode(parsed);
   } catch (error) {
     console.error("Error al interpretar CSV ATAIN", error);
-    return [];
+    return { products: [], duplicateCount: 0 };
   }
 }
 

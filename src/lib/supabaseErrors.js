@@ -16,6 +16,9 @@ export function formatSupabaseError(error, fallback = "No pude conectar con Supa
     if (/payload too large|request entity too large|413/i.test(message)) {
       return "Hay demasiados activos en un solo archivo. Intenta importar por partes.";
     }
+    if (/cannot affect row a second time/i.test(message)) {
+      return "El CSV tiene seriales duplicados. Revisa el archivo o vuelve a importar con la ultima version.";
+    }
 
     return message;
   } catch {

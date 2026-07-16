@@ -147,11 +147,20 @@ export async function upsertSupabaseProducts(clientId, products) {
 
 const IMPORT_BATCH_SIZE = 25;
 
+function dedupeBatchByCode(products) {
+  const byCode = new Map();
+  for (const product of products) {
+    byCode.set(product.code, product);
+  }
+  return Array.from(byCode.values());
+}
+
 export async function upsertSupabaseProductsInBatches(clientId, products) {
   const synced = [];
 
   for (let index = 0; index < products.length; index += IMPORT_BATCH_SIZE) {
-    const chunk = products.slice(index, index + IMPORT_BATCH_SIZE);
+    const chunk = dedupeBatchByCode(products.slice(index, index + IMPORT_BATCH_SIZE));
+    if (!chunk.length) continue;
     const rows = await upsertSupabaseProducts(clientId, chunk);
     if (rows?.length) synced.push(...rows.map(dbProductToApp));
   }
