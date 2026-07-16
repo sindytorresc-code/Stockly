@@ -63,7 +63,22 @@ describe("validateProduct", () => {
   });
 
   it("accepts ATAIN products without price input", () => {
-    expect(validateProduct({ name: "A", code: "1", category: "X", price: 0, stock: 1, purchasePrice: 0, minStock: 0 }, true)).toBeNull();
+    expect(
+      validateProduct(
+        {
+          name: "A",
+          code: "1",
+          category: "X",
+          price: 0,
+          stock: 1,
+          purchasePrice: 0,
+          minStock: 0,
+          spot: "A1",
+          campaign: "PRICELINE1",
+        },
+        true,
+      ),
+    ).toBeNull();
   });
 });
 
