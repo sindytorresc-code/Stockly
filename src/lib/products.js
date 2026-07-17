@@ -46,6 +46,15 @@ export function matchesAtainAssetFilter(product, filter) {
   return category === filter;
 }
 
+export function matchesAtainCampaignFilter(product, filter) {
+  if (filter === "all") return true;
+  return String(product.campaign || "").trim() === filter;
+}
+
+export function matchesAtainFilters(product, assetFilter, campaignFilter) {
+  return matchesAtainAssetFilter(product, assetFilter) && matchesAtainCampaignFilter(product, campaignFilter);
+}
+
 export function computeStats(products, { isAtain = false } = {}) {
   const stats = {
     total: products.length,
@@ -102,21 +111,21 @@ export function dedupeImportProductsByCode(products) {
 }
 
 export function parseProductForm(form, editingProduct, isAtain) {
-  const userTag = String(form.get("tag") || editingProduct?.tag || "En stock");
-  const stock = Number(form.get("stock"));
+  const userTag = String(form.get("tag") || editingProduct?.tag || (isAtain ? "Asignado" : "En stock"));
+  const stock = isAtain ? 1 : Number(form.get("stock"));
 
   return {
     name: String(form.get("name")).trim(),
     code: String(form.get("code")).trim(),
     category: String(form.get("category")).trim(),
-    brand: String(form.get("brand") || "").trim(),
+    brand: isAtain ? String(form.get("warehouse") || "").trim() : String(form.get("brand") || "").trim(),
     price: isAtain ? Number(editingProduct?.price || 0) : Number(form.get("price")),
-    purchasePrice: Number(form.get("purchasePrice") || 0),
+    purchasePrice: isAtain ? 0 : Number(form.get("purchasePrice") || 0),
     spot: String(form.get("spot") || "").trim(),
     campaign: String(form.get("campaign") || "").trim(),
     stock,
-    minStock: Number(form.get("minStock") || 0),
-    image: String(form.get("image") || "").trim(),
+    minStock: isAtain ? 1 : Number(form.get("minStock") || 0),
+    image: isAtain ? "" : String(form.get("image") || "").trim(),
     tag: deriveTag(stock, userTag),
     comments: String(form.get("comments") || "").trim(),
   };
@@ -133,10 +142,12 @@ export function validateProduct(product, isAtain) {
   } else {
     if (!product.spot) return "Completa el spot del activo";
     if (!product.campaign) return "Selecciona la campana";
+    if (!product.brand) return "Selecciona la ubicacion (Bodega, IT o STOCK)";
     const allowed = ["desktop", "pantalla", "headset", "mouse", "teclado"];
     if (!allowed.includes(String(product.category || "").trim().toLowerCase())) {
       return "Selecciona el tipo de activo";
     }
+    return null;
   }
   if (Number.isNaN(product.purchasePrice) || product.purchasePrice < 0) {
     return "Precio de compra invalido";
@@ -398,18 +409,20 @@ function formatAtainSpotNote(spot, hostname) {
   return hostname ? `Spot ${spot} | Hostname: ${hostname}` : `Spot ${spot}`;
 }
 
-function expandAtainRowToProducts(record, campaign) {
+function expandAtainRowToProducts(record, campaign, warehouse = "STOCK") {
   const spot = pickRecordField(record, "spot");
   const campaignValue = String(campaign || pickRecordField(record, "campana", "campaign") || "").trim();
   const hostname = pickRecordField(record, "hostname", "host");
   const modelo = pickRecordField(record, "modelo", "model");
   const desktopSerial = pickRecordField(record, "serial", "serie");
+  const warehouseValue = String(warehouse || "STOCK").trim();
 
   if (!spot || !campaignValue) return [];
 
   const base = {
     spot,
     campaign: campaignValue,
+    brand: warehouseValue,
     price: 0,
     stock: 1,
     minStock: 1,
@@ -426,7 +439,6 @@ function expandAtainRowToProducts(record, campaign) {
       name: modelo,
       code: desktopSerial,
       category: "Desktop",
-      brand: deriveAtainBrand(modelo),
       comments: hostname ? `Hostname: ${hostname}` : "",
     });
   }
@@ -449,7 +461,6 @@ function expandAtainRowToProducts(record, campaign) {
       name: def.name,
       code: serial,
       category: def.category,
-      brand: "",
       comments: spotNote,
     });
   }
@@ -458,7 +469,7 @@ function expandAtainRowToProducts(record, campaign) {
 }
 
 function isValidAtainImportedProduct(item) {
-  if (!item.name || !item.code || !item.spot || !item.campaign) return false;
+  if (!item.name || !item.code || !item.spot || !item.campaign || !item.brand) return false;
   if (!item.category) return false;
   if (Number.isNaN(item.price) || item.price < 0) return false;
   if (!Number.isInteger(item.stock) || item.stock < 0) return false;
@@ -467,15 +478,15 @@ function isValidAtainImportedProduct(item) {
   return true;
 }
 
-export function parseAtainAssetCsv(text, campaign) {
+export function parseAtainAssetCsv(text, campaign, warehouse) {
   const { records } = parseCsvTable(text);
-  const mapped = records.flatMap((record) => expandAtainRowToProducts(record, campaign));
+  const mapped = records.flatMap((record) => expandAtainRowToProducts(record, campaign, warehouse));
 
   if (mapped.length) return mapped;
-  return parseAtainAssetCsvPositional(text, campaign);
+  return parseAtainAssetCsvPositional(text, campaign, warehouse);
 }
 
-function parseAtainAssetCsvPositional(text, campaign) {
+function parseAtainAssetCsvPositional(text, campaign, warehouse) {
   const rows = splitCsvLines(text);
   const delimiter = detectAtainDelimiter(rows);
   if (!delimiter) return [];
@@ -493,7 +504,7 @@ function parseAtainAssetCsvPositional(text, campaign) {
   return table
     .slice(startIndex)
     .filter((cells) => looksLikeAtainDataRow(cells))
-    .flatMap((cells) => expandAtainRowToProducts(cellsToAtainRecord(cells), campaign));
+    .flatMap((cells) => expandAtainRowToProducts(cellsToAtainRecord(cells), campaign, warehouse));
 }
 
 export function describeAtainImportFailure(text) {
@@ -509,10 +520,10 @@ export function describeAtainImportFailure(text) {
   return `Se leyeron ${rows.length} filas y ${firstRow.length} columnas (${preview}). Exporta el Excel como CSV UTF-8 o CSV (delimitado por punto y coma).`;
 }
 
-export function parseAtainImport(text, campaign) {
+export function parseAtainImport(text, { campaign, warehouse = "STOCK" } = {}) {
   try {
-    const imported = parseAtainAssetCsv(text, campaign);
-    const parsed = imported.length ? imported : parseAtainAssetCsvPositional(text, campaign);
+    const imported = parseAtainAssetCsv(text, campaign, warehouse);
+    const parsed = imported.length ? imported : parseAtainAssetCsvPositional(text, campaign, warehouse);
     return dedupeImportProductsByCode(parsed);
   } catch (error) {
     console.error("Error al interpretar CSV ATAIN", error);

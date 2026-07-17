@@ -1,15 +1,17 @@
-import { Upload, X } from "lucide-react";
-import { atainCampaigns } from "../data/businesses.js";
+import { atainCampaigns, ATAIN_WAREHOUSES } from "../data/businesses.js";
 import { useEscapeKey } from "../hooks/useEscapeKey.js";
+import { Upload, X } from "lucide-react";
 
 export default function AtainImportModal({ theme, fileName, onClose, onConfirm }) {
   useEscapeKey(onClose, true);
 
   function handleSubmit(event) {
     event.preventDefault();
-    const campaign = String(new FormData(event.currentTarget).get("campaign") || "").trim();
-    if (!campaign) return;
-    onConfirm(campaign);
+    const form = new FormData(event.currentTarget);
+    const campaign = String(form.get("campaign") || "").trim();
+    const warehouse = String(form.get("warehouse") || "").trim();
+    if (!campaign || !warehouse) return;
+    onConfirm({ campaign, warehouse });
   }
 
   return (
@@ -23,7 +25,7 @@ export default function AtainImportModal({ theme, fileName, onClose, onConfirm }
           <span>
             <span className="block text-lg font-extrabold">Importar activos ATAIN</span>
             <span className={`mt-1 block text-sm ${theme.muted}`}>
-              Selecciona la campana del archivo {fileName ? `"${fileName}"` : "CSV"}.
+              Selecciona la campana y ubicacion del archivo {fileName ? `"${fileName}"` : "CSV"}.
             </span>
           </span>
           <button type="button" onClick={onClose} className={`grid size-9 place-items-center rounded-lg ${theme.panelSoft}`}>
@@ -45,6 +47,22 @@ export default function AtainImportModal({ theme, fileName, onClose, onConfirm }
             {atainCampaigns.map((campaign) => (
               <option key={campaign} value={campaign}>
                 {campaign}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mt-4 grid gap-2">
+          <span className={`text-sm font-bold ${theme.muted}`}>Ubicacion</span>
+          <select
+            name="warehouse"
+            required
+            defaultValue="STOCK"
+            className={`h-[43px] w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${theme.formBorder}`}
+          >
+            {ATAIN_WAREHOUSES.map((warehouse) => (
+              <option key={warehouse} value={warehouse}>
+                {warehouse}
               </option>
             ))}
           </select>

@@ -184,6 +184,10 @@ export async function deleteSupabaseProduct(clientId, product) {
   await supabaseRequest(`/products?${filter}`, { method: "DELETE" });
 }
 
+export async function deleteAllSupabaseProducts(clientId) {
+  await supabaseRequest(`/products?client_id=eq.${clientId}`, { method: "DELETE" });
+}
+
 export async function seedSupabaseProductsIfEmpty(clientId, seedProducts) {
   const rows = await fetchSupabaseProducts(clientId);
   if (rows.length) return rows.map(dbProductToApp);

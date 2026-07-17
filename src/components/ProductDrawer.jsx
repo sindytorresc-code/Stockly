@@ -1,11 +1,11 @@
 import { X } from "lucide-react";
-import { atainCampaigns, ATAIN_ASSET_CATEGORIES, PRODUCT_TAGS } from "../data/businesses.js";
+import { atainCampaigns, ATAIN_ASSET_CATEGORIES, ATAIN_WAREHOUSES, PRODUCT_TAGS } from "../data/businesses.js";
 import { useEscapeKey } from "../hooks/useEscapeKey.js";
 import ModalField from "./ui/ModalField.jsx";
 
 export default function ProductDrawer({ business, theme, product, onClose, onSubmit }) {
   useEscapeKey(onClose);
-  const title = product ? "Editar Producto" : "Agregar Producto";
+  const title = product ? "Editar activo" : "Agregar activo";
   const isAtain = business?.id === "atain";
   const borderClass = theme.formBorder || "border-pink-300 focus:border-pink-500 focus:ring-pink-200";
 
@@ -82,22 +82,38 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
                   ))}
                 </select>
               </label>
+              <label className="grid min-w-0 gap-2 sm:col-span-6">
+                <span className={`text-sm font-bold ${theme.muted}`}>Ubicacion *</span>
+                <select
+                  name="warehouse"
+                  defaultValue={product?.brand || "STOCK"}
+                  required
+                  className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
+                >
+                  {ATAIN_WAREHOUSES.map((warehouse) => (
+                    <option key={warehouse} value={warehouse}>
+                      {warehouse}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </>
           ) : (
-            <ModalField theme={theme} label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
+            <>
+              <ModalField theme={theme} label="Precio *" name="price" type="number" min="0" defaultValue={product?.price} required className="sm:col-span-2" />
+              <ModalField theme={theme} label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required className="sm:col-span-2" />
+              <ModalField theme={theme} label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} className="sm:col-span-2" />
+              <ModalField theme={theme} label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} className="sm:col-span-3" />
+              <ModalField theme={theme} label="Marca" name="brand" defaultValue={product?.brand || ""} className="sm:col-span-3" />
+              <ModalField theme={theme} label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." className="sm:col-span-6" />
+            </>
           )}
-
-          <ModalField theme={theme} label="Stock *" name="stock" type="number" min="0" defaultValue={product?.stock} required className="sm:col-span-2" />
-          <ModalField theme={theme} label="Stock Min." name="minStock" type="number" min="0" defaultValue={product?.minStock ?? 5} className="sm:col-span-2" />
-          <ModalField theme={theme} label="Precio de compra" name="purchasePrice" type="number" min="0" defaultValue={product?.purchasePrice || ""} className="sm:col-span-3" />
-          <ModalField theme={theme} label="Marca" name="brand" defaultValue={product?.brand || ""} className="sm:col-span-3" />
-          <ModalField theme={theme} label="URL de Imagen" name="image" defaultValue={product?.image || ""} placeholder="https://..." className="sm:col-span-6" />
 
           <label className="grid min-w-0 gap-2 sm:col-span-6">
             <span className={`text-sm font-bold ${theme.muted}`}>Estado interno</span>
             <select
               name="tag"
-              defaultValue={product?.tag || "En stock"}
+              defaultValue={product?.tag || (isAtain ? "Asignado" : "En stock")}
               className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
             >
               {PRODUCT_TAGS.map((tag) => (
@@ -119,16 +135,18 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
           </label>
         </div>
 
-        <p className={`mt-4 text-xs font-semibold ${theme.muted}`}>
-          Si el stock es 0, el estado pasa a Agotado (excepto Reparacion).
-        </p>
+        {!isAtain && (
+          <p className={`mt-4 text-xs font-semibold ${theme.muted}`}>
+            Si el stock es 0, el estado pasa a Agotado (excepto Reparacion).
+          </p>
+        )}
 
         <div className="mt-8 flex justify-end gap-3">
           <button type="button" onClick={onClose} className={`h-10 rounded-lg border px-5 text-sm font-extrabold ${theme.panelSoft}`}>
             Cancelar
           </button>
           <button type="submit" className={`h-10 rounded-lg px-7 text-sm font-extrabold text-white ${theme.formAccent || theme.accent}`}>
-            {product ? "Guardar Cambios" : "Guardar Producto"}
+            {product ? "Guardar Cambios" : "Guardar activo"}
           </button>
         </div>
       </form>

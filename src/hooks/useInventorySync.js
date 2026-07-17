@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { defaultProducts } from "../data/businesses.js";
 import { loadProducts, saveProducts } from "../lib/storage.js";
 import {
+  deleteAllSupabaseProducts,
   deleteSupabaseProduct,
   ensureSupabaseClient,
   initSupabase,
@@ -147,6 +148,19 @@ export function useInventorySync(showToast) {
     [getClientIdForBusiness, updateBusinessProducts],
   );
 
+  const clearAllProducts = useCallback(
+    async (business) => {
+      if (await canUseSupabase()) {
+        const clientId = await getClientIdForBusiness(business);
+        await deleteAllSupabaseProducts(clientId);
+        setDataSource("Supabase");
+      }
+
+      updateBusinessProducts(business.id, []);
+    },
+    [getClientIdForBusiness, updateBusinessProducts],
+  );
+
   return {
     productsByBusiness,
     isLoadingProducts,
@@ -155,5 +169,6 @@ export function useInventorySync(showToast) {
     saveProduct,
     deleteProduct,
     importProducts,
+    clearAllProducts,
   };
 }

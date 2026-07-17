@@ -6,11 +6,12 @@ import {
   Package,
   Plus,
   Search,
+  Trash2,
   TriangleAlert,
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { ATAIN_ASSET_FILTERS } from "../data/businesses.js";
+import { ATAIN_ASSET_FILTERS, atainCampaigns } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
 import { money } from "../lib/money.js";
 import ProductRow from "./ProductRow.jsx";
@@ -22,17 +23,20 @@ export default function InventoryDashboard({
   stats,
   query,
   filter,
+  campaignFilter,
   products,
   isLoadingProducts,
   dataSource,
   onBack,
   onQuery,
   onFilter,
+  onCampaignFilter,
   onAdd,
   onEdit,
   onDelete,
   onImport,
   onChangePassword,
+  onClearAll,
 }) {
   const Icon = iconMap[business.icon];
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
@@ -85,6 +89,15 @@ export default function InventoryDashboard({
               >
                 <Plus size={18} /> Agregar activo
               </button>
+              {isAtain && (
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-red-300/40 bg-red-500/20 px-4 font-bold text-white hover:bg-red-500/30"
+                >
+                  <Trash2 size={18} /> Borrar todo
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -112,39 +125,59 @@ export default function InventoryDashboard({
               className="w-full bg-transparent outline-none"
               placeholder={
                 isAtain
-                  ? "Buscar por spot, serial, campana, tipo o hostname..."
+                  ? "Buscar por spot, serial, campana, ubicacion, tipo o hostname..."
                   : "Buscar producto, categoria, codigo, campana o comentario..."
               }
             />
           </label>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {filterOptions.map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onFilter(value)}
-                className={`h-11 shrink-0 rounded-lg border px-4 text-sm font-extrabold ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3 lg:items-end">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {filterOptions.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onFilter(value)}
+                  className={`h-11 shrink-0 rounded-lg border px-4 text-sm font-extrabold ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {isAtain && (
+              <label className={`flex h-11 min-w-[220px] items-center gap-2 rounded-lg border px-3 text-sm font-bold ${theme.input}`}>
+                <span className={`shrink-0 ${theme.muted}`}>Campana:</span>
+                <select
+                  value={campaignFilter}
+                  onChange={(event) => onCampaignFilter(event.target.value)}
+                  className="w-full bg-transparent font-extrabold outline-none"
+                >
+                  <option value="all">Todas</option>
+                  {atainCampaigns.map((campaign) => (
+                    <option key={campaign} value={campaign}>
+                      {campaign}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         </section>
 
         <section className={`overflow-hidden rounded-lg border ${theme.panel}`}>
           <div className="overflow-x-auto">
-            <table className={`w-full border-collapse ${isAtain ? "min-w-[980px]" : "min-w-[1120px]"} table-fixed`}>
+            <table className={`w-full border-collapse ${isAtain ? "min-w-[1080px]" : "min-w-[1120px]"} table-fixed`}>
               <thead className={theme.tableHead}>
                 <tr className="text-left text-xs font-extrabold uppercase tracking-wide">
                   {isAtain ? (
                     <>
-                      <th className="w-[10%] px-4 py-4">Spot</th>
-                      <th className="w-[12%] px-4 py-4">Tipo</th>
-                      <th className="w-[22%] px-4 py-4">Activo</th>
-                      <th className="w-[16%] px-4 py-4">Serial</th>
-                      <th className="w-[14%] px-4 py-4">Campana</th>
-                      <th className="w-[11%] px-4 py-4">Estado</th>
-                      <th className="w-[17%] px-4 py-4">Detalle</th>
+                      <th className="w-[9%] px-4 py-4">Spot</th>
+                      <th className="w-[10%] px-4 py-4">Tipo</th>
+                      <th className="w-[18%] px-4 py-4">Activo</th>
+                      <th className="w-[14%] px-4 py-4">Serial</th>
+                      <th className="w-[13%] px-4 py-4">Campana</th>
+                      <th className="w-[10%] px-4 py-4">Ubicacion</th>
+                      <th className="w-[10%] px-4 py-4">Estado</th>
+                      <th className="w-[14%] px-4 py-4">Detalle</th>
                     </>
                   ) : (
                     <>

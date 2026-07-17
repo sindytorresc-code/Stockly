@@ -4,6 +4,8 @@ import {
   deriveTag,
   matchesFilter,
   matchesAtainAssetFilter,
+  matchesAtainCampaignFilter,
+  matchesAtainFilters,
   matchesSearch,
   mergeProductsByCode,
   parseCsvProducts,
@@ -81,6 +83,7 @@ describe("validateProduct", () => {
           minStock: 0,
           spot: "A1",
           campaign: "PRICELINE1",
+          brand: "STOCK",
         },
         true,
       ),
@@ -162,7 +165,7 @@ describe("parseAtainAssetCsv", () => {
       "40;ThinkCentre M720q;MJ0BV0T8;BG1DTRNMJ0BV0T8;CN0SCREEN2;;S/N;S/N;CN0KEY2",
     ].join("\n");
 
-    expect(parseAtainImport(csv, "TRN1").products.length).toBeGreaterThan(3);
+    expect(parseAtainImport(csv, { campaign: "TRN1" }).products.length).toBeGreaterThan(3);
   });
 
   it("skips sep= lines from Excel", () => {
@@ -172,7 +175,7 @@ describe("parseAtainAssetCsv", () => {
       "39;Optiplex 3050 Micro;9PP2WP2;BG1DTRN9PP2WP2;CN0SCREEN1;S/N;S/N;CN0MOUSE1;CN0KEY1",
     ].join("\n");
 
-    expect(parseAtainImport(csv, "TRN1").products.length).toBeGreaterThan(1);
+    expect(parseAtainImport(csv, { campaign: "TRN1" }).products.length).toBeGreaterThan(1);
   });
 });
 
@@ -211,6 +214,19 @@ describe("matchesAtainAssetFilter", () => {
     expect(matchesAtainAssetFilter(desktop, "desktop")).toBe(true);
     expect(matchesAtainAssetFilter(screen, "desktop")).toBe(false);
     expect(matchesAtainAssetFilter(screen, "pantalla")).toBe(true);
+  });
+});
+
+describe("matchesAtainCampaignFilter", () => {
+  it("filters assets by campaign", () => {
+    const trn = { campaign: "TRN1" };
+    const blue = { campaign: "BLUELINK" };
+
+    expect(matchesAtainCampaignFilter(trn, "all")).toBe(true);
+    expect(matchesAtainCampaignFilter(trn, "TRN1")).toBe(true);
+    expect(matchesAtainCampaignFilter(blue, "TRN1")).toBe(false);
+    expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1" }, "desktop", "TRN1")).toBe(true);
+    expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1" }, "mouse", "TRN1")).toBe(false);
   });
 });
 

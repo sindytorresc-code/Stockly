@@ -14,7 +14,7 @@ import { useToast } from "./hooks/useToast.js";
 import {
   computeStats,
   matchesFilter,
-  matchesAtainAssetFilter,
+  matchesAtainFilters,
   matchesSearch,
   decodeCsvText,
   describeAtainImportFailure,
@@ -39,6 +39,7 @@ export default function App() {
     saveProduct,
     deleteProduct,
     importProducts,
+    clearAllProducts,
   } = useInventorySync(showToast);
   const { pinsByBusiness, pinsReady, loadActivePin, savePin, verifyActivePin, hasRemotePins } = usePinSync(showToast);
 
@@ -49,11 +50,13 @@ export default function App() {
   const [pinError, setPinError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [campaignFilter, setCampaignFilter] = useState("all");
   const [editingProduct, setEditingProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [atainImportDraft, setAtainImportDraft] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0].theme;
   const products = selectedBusiness ? productsByBusiness[selectedBusiness.id] || [] : [];
@@ -63,9 +66,9 @@ export default function App() {
     return products
       .filter((product) => matchesSearch(product, query))
       .filter((product) =>
-        isAtain ? matchesAtainAssetFilter(product, filter) : matchesFilter(product, filter),
+        isAtain ? matchesAtainFilters(product, filter, campaignFilter) : matchesFilter(product, filter),
       );
-  }, [products, query, filter, selectedBusiness]);
+  }, [products, query, filter, campaignFilter, selectedBusiness]);
 
   const stats = useMemo(
     () => computeStats(products, { isAtain: selectedBusiness?.id === "atain" }),
@@ -74,6 +77,7 @@ export default function App() {
 
   const resetSessionFilters = useCallback(() => {
     setFilter("all");
+    setCampaignFilter("all");
     setQuery("");
   }, []);
 
@@ -257,11 +261,11 @@ export default function App() {
     showToast(`${count} productos cargados`);
   }
 
-  async function handleAtainImportConfirm(campaign) {
+  async function handleAtainImportConfirm({ campaign, warehouse }) {
     if (!atainImportDraft || !selectedBusiness) return;
 
     try {
-      const { products: imported, duplicateCount } = parseAtainImport(atainImportDraft.text, campaign);
+      const { products: imported, duplicateCount } = parseAtainImport(atainImportDraft.text, { campaign, warehouse });
       if (!imported.length) {
         showToast(describeAtainImportFailure(atainImportDraft.text));
         return;
@@ -277,6 +281,18 @@ export default function App() {
     } catch (error) {
       console.error(error);
       showToast(formatSupabaseError(error, "No pude guardar los activos. Revisa la conexion con Supabase."));
+    }
+  }
+
+  async function confirmClearAllProducts() {
+    if (!selectedBusiness) return;
+    try {
+      await clearAllProducts(selectedBusiness);
+      setClearAllConfirmOpen(false);
+      showToast("Todos los activos fueron eliminados");
+    } catch (error) {
+      console.error(error);
+      showToast(formatSupabaseError(error, "No pude borrar los activos"));
     }
   }
 
@@ -369,17 +385,20 @@ export default function App() {
           stats={stats}
           query={query}
           filter={filter}
+          campaignFilter={campaignFilter}
           products={visibleProducts}
           isLoadingProducts={isLoadingProducts}
           dataSource={dataSource}
           onBack={backToClients}
           onQuery={setQuery}
           onFilter={setFilter}
+          onCampaignFilter={setCampaignFilter}
           onAdd={() => openProductForm()}
           onEdit={openProductForm}
           onDelete={setProductToDelete}
           onImport={handleImportCsv}
           onChangePassword={() => setPasswordModalOpen(true)}
+          onClearAll={() => setClearAllConfirmOpen(true)}
         />
       )}
 
@@ -428,6 +447,16 @@ export default function App() {
           confirmLabel="Eliminar"
           onConfirm={confirmDeleteProduct}
           onCancel={() => setProductToDelete(null)}
+        />
+      )}
+
+      {clearAllConfirmOpen && (
+        <ConfirmDialog
+          title="Borrar todos los activos"
+          message="Estas segura de que deseas borrar todos los activos guardados de ATAIN? Esta accion no se puede deshacer."
+          confirmLabel="Si, borrar todo"
+          onConfirm={confirmClearAllProducts}
+          onCancel={() => setClearAllConfirmOpen(false)}
         />
       )}
 

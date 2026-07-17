@@ -1,4 +1,5 @@
 import { Package, Pencil, Trash2 } from "lucide-react";
+import { getAtainAssetIcon } from "../lib/atainIcons.js";
 import { money } from "../lib/money.js";
 import { tagClass } from "../lib/products.js";
 import Pill from "./ui/Pill.jsx";
@@ -6,6 +7,8 @@ import StockPill from "./ui/StockPill.jsx";
 
 export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }) {
   if (isAtain) {
+    const AssetIcon = getAtainAssetIcon(product.category);
+
     return (
       <tr className={`border-t ${theme.row}`}>
         <td className="px-4 py-3 font-extrabold">{product.spot || "Sin spot"}</td>
@@ -15,13 +18,10 @@ export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }
         <td className="px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className={`grid size-10 place-items-center rounded-lg ${theme.softAccent}`}>
-              <Package size={18} />
+              <AssetIcon size={18} />
             </span>
             <span className="min-w-0">
               <span className="block truncate font-extrabold">{product.name}</span>
-              {product.brand ? (
-                <span className={`block truncate text-xs ${theme.muted}`}>{product.brand}</span>
-              ) : null}
             </span>
           </div>
         </td>
@@ -30,6 +30,9 @@ export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }
         </td>
         <td className={`truncate px-4 py-3 text-sm font-extrabold ${theme.muted}`} title={product.campaign || ""}>
           {product.campaign || "Sin campana"}
+        </td>
+        <td className="px-4 py-3">
+          <Pill className={theme.softAccent}>{product.brand || "Sin ubicacion"}</Pill>
         </td>
         <td className="px-4 py-3">
           <Pill className={tagClass(product.tag)}>{product.tag}</Pill>
