@@ -5,6 +5,7 @@ import {
   matchesFilter,
   matchesAtainAssetFilter,
   matchesAtainCampaignFilter,
+  matchesAtainWarehouseFilter,
   matchesAtainFilters,
   matchesSearch,
   mergeProductsByCode,
@@ -227,6 +228,9 @@ describe("matchesAtainCampaignFilter", () => {
     expect(matchesAtainCampaignFilter(blue, "TRN1")).toBe(false);
     expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1" }, "desktop", "TRN1")).toBe(true);
     expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1" }, "mouse", "TRN1")).toBe(false);
+    expect(matchesAtainWarehouseFilter({ brand: "Bodega" }, "Bodega")).toBe(true);
+    expect(matchesAtainWarehouseFilter({ brand: "IT" }, "Bodega")).toBe(false);
+    expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1", brand: "Bodega" }, "all", "all", "Bodega")).toBe(true);
   });
 });
 

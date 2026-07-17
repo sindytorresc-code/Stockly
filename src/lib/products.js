@@ -51,8 +51,17 @@ export function matchesAtainCampaignFilter(product, filter) {
   return String(product.campaign || "").trim() === filter;
 }
 
-export function matchesAtainFilters(product, assetFilter, campaignFilter) {
-  return matchesAtainAssetFilter(product, assetFilter) && matchesAtainCampaignFilter(product, campaignFilter);
+export function matchesAtainWarehouseFilter(product, filter) {
+  if (filter === "all") return true;
+  return String(product.brand || "").trim().toLowerCase() === filter.toLowerCase();
+}
+
+export function matchesAtainFilters(product, assetFilter, campaignFilter, warehouseFilter = "all") {
+  return (
+    matchesAtainAssetFilter(product, assetFilter) &&
+    matchesAtainCampaignFilter(product, campaignFilter) &&
+    matchesAtainWarehouseFilter(product, warehouseFilter)
+  );
 }
 
 export function computeStats(products, { isAtain = false } = {}) {

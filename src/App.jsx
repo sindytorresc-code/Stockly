@@ -51,6 +51,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
+  const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [editingProduct, setEditingProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -66,9 +67,9 @@ export default function App() {
     return products
       .filter((product) => matchesSearch(product, query))
       .filter((product) =>
-        isAtain ? matchesAtainFilters(product, filter, campaignFilter) : matchesFilter(product, filter),
+        isAtain ? matchesAtainFilters(product, filter, campaignFilter, warehouseFilter) : matchesFilter(product, filter),
       );
-  }, [products, query, filter, campaignFilter, selectedBusiness]);
+  }, [products, query, filter, campaignFilter, warehouseFilter, selectedBusiness]);
 
   const stats = useMemo(
     () => computeStats(products, { isAtain: selectedBusiness?.id === "atain" }),
@@ -78,6 +79,7 @@ export default function App() {
   const resetSessionFilters = useCallback(() => {
     setFilter("all");
     setCampaignFilter("all");
+    setWarehouseFilter("all");
     setQuery("");
   }, []);
 
@@ -386,6 +388,7 @@ export default function App() {
           query={query}
           filter={filter}
           campaignFilter={campaignFilter}
+          warehouseFilter={warehouseFilter}
           products={visibleProducts}
           isLoadingProducts={isLoadingProducts}
           dataSource={dataSource}
@@ -393,6 +396,7 @@ export default function App() {
           onQuery={setQuery}
           onFilter={setFilter}
           onCampaignFilter={setCampaignFilter}
+          onWarehouseFilter={setWarehouseFilter}
           onAdd={() => openProductForm()}
           onEdit={openProductForm}
           onDelete={setProductToDelete}

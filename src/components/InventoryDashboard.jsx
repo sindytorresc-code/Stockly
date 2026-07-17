@@ -11,11 +11,30 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { ATAIN_ASSET_FILTERS, atainCampaigns } from "../data/businesses.js";
+import { ATAIN_ASSET_FILTERS, ATAIN_WAREHOUSES, atainCampaigns } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
 import { money } from "../lib/money.js";
 import ProductRow from "./ProductRow.jsx";
 import StatCard from "./StatCard.jsx";
+
+function AtainSelectFilter({ label, value, options, theme, onChange }) {
+  return (
+    <label className={`flex h-11 min-w-[200px] items-center gap-2 rounded-lg border px-3 text-sm font-bold ${theme.input}`}>
+      <span className={`shrink-0 ${theme.muted}`}>{label}:</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`min-w-0 flex-1 cursor-pointer appearance-none border-0 bg-transparent py-0 pl-0 pr-6 text-sm font-extrabold outline-none [color-scheme:dark] ${theme.text}`}
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue} className="bg-slate-950 text-white">
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 export default function InventoryDashboard({
   business,
@@ -24,6 +43,7 @@ export default function InventoryDashboard({
   query,
   filter,
   campaignFilter,
+  warehouseFilter,
   products,
   isLoadingProducts,
   dataSource,
@@ -31,6 +51,7 @@ export default function InventoryDashboard({
   onQuery,
   onFilter,
   onCampaignFilter,
+  onWarehouseFilter,
   onAdd,
   onEdit,
   onDelete,
@@ -144,21 +165,22 @@ export default function InventoryDashboard({
               ))}
             </div>
             {isAtain && (
-              <label className={`flex h-11 min-w-[220px] items-center gap-2 rounded-lg border px-3 text-sm font-bold ${theme.input}`}>
-                <span className={`shrink-0 ${theme.muted}`}>Campana:</span>
-                <select
+              <div className="flex flex-wrap justify-end gap-2">
+                <AtainSelectFilter
+                  label="Campana"
                   value={campaignFilter}
-                  onChange={(event) => onCampaignFilter(event.target.value)}
-                  className="w-full bg-transparent font-extrabold outline-none"
-                >
-                  <option value="all">Todas</option>
-                  {atainCampaigns.map((campaign) => (
-                    <option key={campaign} value={campaign}>
-                      {campaign}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  theme={theme}
+                  onChange={onCampaignFilter}
+                  options={[["all", "Todas"], ...atainCampaigns.map((campaign) => [campaign, campaign])]}
+                />
+                <AtainSelectFilter
+                  label="Ubicacion"
+                  value={warehouseFilter}
+                  theme={theme}
+                  onChange={onWarehouseFilter}
+                  options={[["all", "Todas"], ...ATAIN_WAREHOUSES.map((warehouse) => [warehouse, warehouse])]}
+                />
+              </div>
             )}
           </div>
         </section>
