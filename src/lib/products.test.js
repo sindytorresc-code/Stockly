@@ -5,7 +5,6 @@ import {
   matchesFilter,
   matchesAtainAssetFilter,
   matchesAtainCampaignFilter,
-  matchesAtainWarehouseFilter,
   matchesAtainFilters,
   matchesSearch,
   mergeProductsByCode,
@@ -84,7 +83,7 @@ describe("validateProduct", () => {
           minStock: 0,
           spot: "A1",
           campaign: "PRICELINE1",
-          brand: "STOCK",
+          brand: "Bodega",
         },
         true,
       ),
@@ -226,11 +225,11 @@ describe("matchesAtainCampaignFilter", () => {
     expect(matchesAtainCampaignFilter(trn, "all")).toBe(true);
     expect(matchesAtainCampaignFilter(trn, "TRN1")).toBe(true);
     expect(matchesAtainCampaignFilter(blue, "TRN1")).toBe(false);
+    expect(matchesAtainCampaignFilter({ brand: "Bodega" }, "Bodega")).toBe(true);
+    expect(matchesAtainCampaignFilter({ brand: "Bodega", campaign: "TRN1" }, "TRN1")).toBe(false);
     expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1" }, "desktop", "TRN1")).toBe(true);
     expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1" }, "mouse", "TRN1")).toBe(false);
-    expect(matchesAtainWarehouseFilter({ brand: "Bodega" }, "Bodega")).toBe(true);
-    expect(matchesAtainWarehouseFilter({ brand: "IT" }, "Bodega")).toBe(false);
-    expect(matchesAtainFilters({ category: "Desktop", campaign: "TRN1", brand: "Bodega" }, "all", "all", "Bodega")).toBe(true);
+    expect(matchesAtainFilters({ category: "Desktop", brand: "Bodega" }, "all", "Bodega")).toBe(true);
   });
 });
 

@@ -11,7 +11,7 @@ import {
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { ATAIN_ASSET_FILTERS, ATAIN_WAREHOUSES, atainCampaigns } from "../data/businesses.js";
+import { ATAIN_ASSET_FILTERS, ATAIN_BODEGA, atainCampaigns } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
 import { money } from "../lib/money.js";
 import ProductRow from "./ProductRow.jsx";
@@ -43,7 +43,6 @@ export default function InventoryDashboard({
   query,
   filter,
   campaignFilter,
-  warehouseFilter,
   products,
   isLoadingProducts,
   dataSource,
@@ -51,7 +50,6 @@ export default function InventoryDashboard({
   onQuery,
   onFilter,
   onCampaignFilter,
-  onWarehouseFilter,
   onAdd,
   onEdit,
   onDelete,
@@ -146,7 +144,7 @@ export default function InventoryDashboard({
               className="w-full bg-transparent outline-none"
               placeholder={
                 isAtain
-                  ? "Buscar por spot, serial, campana, ubicacion, tipo o hostname..."
+                  ? "Buscar por spot, serial, campana, bodega, tipo o hostname..."
                   : "Buscar producto, categoria, codigo, campana o comentario..."
               }
             />
@@ -165,41 +163,35 @@ export default function InventoryDashboard({
               ))}
             </div>
             {isAtain && (
-              <div className="flex flex-wrap justify-end gap-2">
-                <AtainSelectFilter
-                  label="Campana"
-                  value={campaignFilter}
-                  theme={theme}
-                  onChange={onCampaignFilter}
-                  options={[["all", "Todas"], ...atainCampaigns.map((campaign) => [campaign, campaign])]}
-                />
-                <AtainSelectFilter
-                  label="Ubicacion"
-                  value={warehouseFilter}
-                  theme={theme}
-                  onChange={onWarehouseFilter}
-                  options={[["all", "Todas"], ...ATAIN_WAREHOUSES.map((warehouse) => [warehouse, warehouse])]}
-                />
-              </div>
+              <AtainSelectFilter
+                label="Campana"
+                value={campaignFilter}
+                theme={theme}
+                onChange={onCampaignFilter}
+                options={[
+                  ["all", "Todas"],
+                  [ATAIN_BODEGA, ATAIN_BODEGA],
+                  ...atainCampaigns.map((campaign) => [campaign, campaign]),
+                ]}
+              />
             )}
           </div>
         </section>
 
         <section className={`overflow-hidden rounded-lg border ${theme.panel}`}>
           <div className="overflow-x-auto">
-            <table className={`w-full border-collapse ${isAtain ? "min-w-[1080px]" : "min-w-[1120px]"} table-fixed`}>
+            <table className={`w-full border-collapse ${isAtain ? "min-w-[980px]" : "min-w-[1120px]"} table-fixed`}>
               <thead className={theme.tableHead}>
                 <tr className="text-left text-xs font-extrabold uppercase tracking-wide">
                   {isAtain ? (
                     <>
-                      <th className="w-[9%] px-4 py-4">Spot</th>
-                      <th className="w-[10%] px-4 py-4">Tipo</th>
-                      <th className="w-[18%] px-4 py-4">Activo</th>
-                      <th className="w-[14%] px-4 py-4">Serial</th>
-                      <th className="w-[13%] px-4 py-4">Campana</th>
-                      <th className="w-[10%] px-4 py-4">Ubicacion</th>
-                      <th className="w-[10%] px-4 py-4">Estado</th>
-                      <th className="w-[14%] px-4 py-4">Detalle</th>
+                      <th className="w-[10%] px-4 py-4">Spot</th>
+                      <th className="w-[11%] px-4 py-4">Tipo</th>
+                      <th className="w-[20%] px-4 py-4">Activo</th>
+                      <th className="w-[15%] px-4 py-4">Serial</th>
+                      <th className="w-[14%] px-4 py-4">Campana</th>
+                      <th className="w-[11%] px-4 py-4">Estado</th>
+                      <th className="w-[17%] px-4 py-4">Detalle</th>
                     </>
                   ) : (
                     <>

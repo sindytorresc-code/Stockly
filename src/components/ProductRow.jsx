@@ -1,4 +1,5 @@
 import { Package, Pencil, Trash2 } from "lucide-react";
+import { ATAIN_BODEGA } from "../data/businesses.js";
 import { getAtainAssetIcon } from "../lib/atainIcons.js";
 import { money } from "../lib/money.js";
 import { tagClass } from "../lib/products.js";
@@ -28,11 +29,8 @@ export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }
         <td className={`truncate px-4 py-3 font-mono text-sm font-bold ${theme.muted}`} title={product.code}>
           {product.code}
         </td>
-        <td className={`truncate px-4 py-3 text-sm font-extrabold ${theme.muted}`} title={product.campaign || ""}>
-          {product.campaign || "Sin campana"}
-        </td>
-        <td className="px-4 py-3">
-          <Pill className={theme.softAccent}>{product.brand || "Sin ubicacion"}</Pill>
+        <td className={`truncate px-4 py-3 text-sm font-extrabold ${theme.muted}`} title={product.campaign || product.brand || ""}>
+          {product.brand === ATAIN_BODEGA ? ATAIN_BODEGA : product.campaign || "Sin campana"}
         </td>
         <td className="px-4 py-3">
           <Pill className={tagClass(product.tag)}>{product.tag}</Pill>

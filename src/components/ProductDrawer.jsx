@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { atainCampaigns, ATAIN_ASSET_CATEGORIES, ATAIN_WAREHOUSES, PRODUCT_TAGS } from "../data/businesses.js";
+import { atainCampaigns, ATAIN_ASSET_CATEGORIES, ATAIN_BODEGA, PRODUCT_TAGS } from "../data/businesses.js";
 import { useEscapeKey } from "../hooks/useEscapeKey.js";
 import ModalField from "./ui/ModalField.jsx";
 
@@ -7,6 +7,7 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
   useEscapeKey(onClose);
   const title = product ? "Editar activo" : "Agregar activo";
   const isAtain = business?.id === "atain";
+  const inBodega = product?.brand === ATAIN_BODEGA;
   const borderClass = theme.formBorder || "border-pink-300 focus:border-pink-500 focus:ring-pink-200";
 
   return (
@@ -67,35 +68,29 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
                 className="sm:col-span-3"
               />
               <label className="grid min-w-0 gap-2 sm:col-span-3">
-                <span className={`text-sm font-bold ${theme.muted}`}>Campana *</span>
+                <span className={`text-sm font-bold ${theme.muted}`}>Campana{inBodega ? "" : " *"}</span>
                 <select
                   name="campaign"
                   defaultValue={product?.campaign || ""}
-                  required
-                  className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
+                  required={!inBodega}
+                  className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 [color-scheme:dark] ${theme.input} ${borderClass}`}
                 >
                   <option value="">Seleccionar campana</option>
                   {atainCampaigns.map((campaign) => (
-                    <option key={campaign} value={campaign}>
+                    <option key={campaign} value={campaign} className="bg-slate-950 text-white">
                       {campaign}
                     </option>
                   ))}
                 </select>
               </label>
-              <label className="grid min-w-0 gap-2 sm:col-span-6">
-                <span className={`text-sm font-bold ${theme.muted}`}>Ubicacion *</span>
-                <select
-                  name="warehouse"
-                  defaultValue={product?.brand || "STOCK"}
-                  required
-                  className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
-                >
-                  {ATAIN_WAREHOUSES.map((warehouse) => (
-                    <option key={warehouse} value={warehouse}>
-                      {warehouse}
-                    </option>
-                  ))}
-                </select>
+              <label className={`flex min-h-[43px] items-center gap-3 rounded-lg border px-3 sm:col-span-6 ${theme.input} ${borderClass}`}>
+                <input
+                  type="checkbox"
+                  name="inBodega"
+                  defaultChecked={inBodega}
+                  className="size-4 accent-blue-500"
+                />
+                <span className="text-sm font-bold">Activo en bodega</span>
               </label>
             </>
           ) : (

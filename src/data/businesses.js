@@ -58,7 +58,7 @@ export const ATAIN_ASSET_FILTERS = [
   ["teclado", "Teclado"],
 ];
 
-export const ATAIN_WAREHOUSES = ["Bodega", "IT", "STOCK"];
+export const ATAIN_BODEGA = "Bodega";
 
 export const businesses = [
   {

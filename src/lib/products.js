@@ -48,20 +48,13 @@ export function matchesAtainAssetFilter(product, filter) {
 
 export function matchesAtainCampaignFilter(product, filter) {
   if (filter === "all") return true;
-  return String(product.campaign || "").trim() === filter;
+  const inBodega = String(product.brand || "").trim().toLowerCase() === "bodega";
+  if (filter === "Bodega") return inBodega;
+  return !inBodega && String(product.campaign || "").trim() === filter;
 }
 
-export function matchesAtainWarehouseFilter(product, filter) {
-  if (filter === "all") return true;
-  return String(product.brand || "").trim().toLowerCase() === filter.toLowerCase();
-}
-
-export function matchesAtainFilters(product, assetFilter, campaignFilter, warehouseFilter = "all") {
-  return (
-    matchesAtainAssetFilter(product, assetFilter) &&
-    matchesAtainCampaignFilter(product, campaignFilter) &&
-    matchesAtainWarehouseFilter(product, warehouseFilter)
-  );
+export function matchesAtainFilters(product, assetFilter, campaignFilter) {
+  return matchesAtainAssetFilter(product, assetFilter) && matchesAtainCampaignFilter(product, campaignFilter);
 }
 
 export function computeStats(products, { isAtain = false } = {}) {
@@ -127,7 +120,7 @@ export function parseProductForm(form, editingProduct, isAtain) {
     name: String(form.get("name")).trim(),
     code: String(form.get("code")).trim(),
     category: String(form.get("category")).trim(),
-    brand: isAtain ? String(form.get("warehouse") || "").trim() : String(form.get("brand") || "").trim(),
+    brand: isAtain ? (form.get("inBodega") === "on" ? "Bodega" : "") : String(form.get("brand") || "").trim(),
     price: isAtain ? Number(editingProduct?.price || 0) : Number(form.get("price")),
     purchasePrice: isAtain ? 0 : Number(form.get("purchasePrice") || 0),
     spot: String(form.get("spot") || "").trim(),
@@ -150,8 +143,8 @@ export function validateProduct(product, isAtain) {
     }
   } else {
     if (!product.spot) return "Completa el spot del activo";
-    if (!product.campaign) return "Selecciona la campana";
-    if (!product.brand) return "Selecciona la ubicacion (Bodega, IT o STOCK)";
+    const inBodega = String(product.brand || "").trim().toLowerCase() === "bodega";
+    if (!inBodega && !product.campaign) return "Selecciona la campana";
     const allowed = ["desktop", "pantalla", "headset", "mouse", "teclado"];
     if (!allowed.includes(String(product.category || "").trim().toLowerCase())) {
       return "Selecciona el tipo de activo";
@@ -418,20 +411,19 @@ function formatAtainSpotNote(spot, hostname) {
   return hostname ? `Spot ${spot} | Hostname: ${hostname}` : `Spot ${spot}`;
 }
 
-function expandAtainRowToProducts(record, campaign, warehouse = "STOCK") {
+function expandAtainRowToProducts(record, campaign) {
   const spot = pickRecordField(record, "spot");
   const campaignValue = String(campaign || pickRecordField(record, "campana", "campaign") || "").trim();
   const hostname = pickRecordField(record, "hostname", "host");
   const modelo = pickRecordField(record, "modelo", "model");
   const desktopSerial = pickRecordField(record, "serial", "serie");
-  const warehouseValue = String(warehouse || "STOCK").trim();
 
   if (!spot || !campaignValue) return [];
 
   const base = {
     spot,
     campaign: campaignValue,
-    brand: warehouseValue,
+    brand: "",
     price: 0,
     stock: 1,
     minStock: 1,
@@ -478,7 +470,7 @@ function expandAtainRowToProducts(record, campaign, warehouse = "STOCK") {
 }
 
 function isValidAtainImportedProduct(item) {
-  if (!item.name || !item.code || !item.spot || !item.campaign || !item.brand) return false;
+  if (!item.name || !item.code || !item.spot || !item.campaign) return false;
   if (!item.category) return false;
   if (Number.isNaN(item.price) || item.price < 0) return false;
   if (!Number.isInteger(item.stock) || item.stock < 0) return false;
@@ -487,15 +479,15 @@ function isValidAtainImportedProduct(item) {
   return true;
 }
 
-export function parseAtainAssetCsv(text, campaign, warehouse) {
+export function parseAtainAssetCsv(text, campaign) {
   const { records } = parseCsvTable(text);
-  const mapped = records.flatMap((record) => expandAtainRowToProducts(record, campaign, warehouse));
+  const mapped = records.flatMap((record) => expandAtainRowToProducts(record, campaign));
 
   if (mapped.length) return mapped;
-  return parseAtainAssetCsvPositional(text, campaign, warehouse);
+  return parseAtainAssetCsvPositional(text, campaign);
 }
 
-function parseAtainAssetCsvPositional(text, campaign, warehouse) {
+function parseAtainAssetCsvPositional(text, campaign) {
   const rows = splitCsvLines(text);
   const delimiter = detectAtainDelimiter(rows);
   if (!delimiter) return [];
@@ -513,7 +505,7 @@ function parseAtainAssetCsvPositional(text, campaign, warehouse) {
   return table
     .slice(startIndex)
     .filter((cells) => looksLikeAtainDataRow(cells))
-    .flatMap((cells) => expandAtainRowToProducts(cellsToAtainRecord(cells), campaign, warehouse));
+    .flatMap((cells) => expandAtainRowToProducts(cellsToAtainRecord(cells), campaign));
 }
 
 export function describeAtainImportFailure(text) {
@@ -529,10 +521,10 @@ export function describeAtainImportFailure(text) {
   return `Se leyeron ${rows.length} filas y ${firstRow.length} columnas (${preview}). Exporta el Excel como CSV UTF-8 o CSV (delimitado por punto y coma).`;
 }
 
-export function parseAtainImport(text, { campaign, warehouse = "STOCK" } = {}) {
+export function parseAtainImport(text, { campaign } = {}) {
   try {
-    const imported = parseAtainAssetCsv(text, campaign, warehouse);
-    const parsed = imported.length ? imported : parseAtainAssetCsvPositional(text, campaign, warehouse);
+    const imported = parseAtainAssetCsv(text, campaign);
+    const parsed = imported.length ? imported : parseAtainAssetCsvPositional(text, campaign);
     return dedupeImportProductsByCode(parsed);
   } catch (error) {
     console.error("Error al interpretar CSV ATAIN", error);
