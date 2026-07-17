@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { computeAtainAssetBreakdown } from "./atainStats.js";
 import {
   computeStats,
   deriveTag,
@@ -280,5 +281,19 @@ describe("computeStats", () => {
     );
 
     expect(stats.assigned).toBe(1);
+  });
+});
+
+describe("computeAtainAssetBreakdown", () => {
+  it("counts assets by type", () => {
+    const breakdown = computeAtainAssetBreakdown([
+      { category: "Desktop" },
+      { category: "Desktop" },
+      { category: "Mouse" },
+    ]);
+
+    expect(breakdown.find((item) => item.key === "desktop")?.count).toBe(2);
+    expect(breakdown.find((item) => item.key === "mouse")?.count).toBe(1);
+    expect(breakdown.find((item) => item.key === "headset")?.count).toBe(0);
   });
 });

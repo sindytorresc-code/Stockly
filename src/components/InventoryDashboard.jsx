@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  ClipboardCheck,
   Database,
   DollarSign,
   Package,
@@ -14,6 +13,7 @@ import {
 import { ATAIN_ASSET_FILTERS, ATAIN_BODEGA, atainCampaigns } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
 import { money } from "../lib/money.js";
+import AtainAssetPieChart from "./AtainAssetPieChart.jsx";
 import ProductRow from "./ProductRow.jsx";
 import StatCard from "./StatCard.jsx";
 
@@ -43,6 +43,7 @@ export default function InventoryDashboard({
   query,
   filter,
   campaignFilter,
+  atainChartProducts = [],
   products,
   isLoadingProducts,
   dataSource,
@@ -68,6 +69,7 @@ export default function InventoryDashboard({
         ["low", "Stock bajo"],
         ["empty", "Agotados"],
       ];
+  const activeFilterLabel = filterOptions.find(([value]) => value === filter)?.[1] ?? "Activos";
 
   return (
     <>
@@ -123,17 +125,23 @@ export default function InventoryDashboard({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8">
-        <section className={`grid gap-4 ${isAtain ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
-          <StatCard theme={theme} icon={Package} value={stats.total} label={isAtain ? "Activos" : "Productos"} />
-          {!isAtain && (
+        {isAtain ? (
+          <div className="mb-8">
+            <AtainAssetPieChart
+              products={atainChartProducts}
+              activeFilter={filter}
+              theme={theme}
+              onFilter={onFilter}
+            />
+          </div>
+        ) : (
+          <section className="grid gap-4 md:grid-cols-4">
+            <StatCard theme={theme} icon={Package} value={stats.total} label="Productos" />
             <StatCard theme={theme} icon={DollarSign} value={money.format(stats.value)} label="Valor total" />
-          )}
-          {isAtain && (
-            <StatCard theme={theme} icon={ClipboardCheck} value={stats.assigned ?? 0} label="Asignados" />
-          )}
-          <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
-          <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
-        </section>
+            <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
+            <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
+          </section>
+        )}
 
         <section className="my-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <label className={`flex h-11 w-full max-w-xl items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
@@ -218,6 +226,16 @@ export default function InventoryDashboard({
                   />
                 ))}
               </tbody>
+              {isAtain && products.length > 0 && (
+                <tfoot className={`border-t ${theme.tableHead}`}>
+                  <tr>
+                    <td colSpan={7} className="px-4 py-4 text-right text-sm font-extrabold uppercase tracking-wide">
+                      Total {activeFilterLabel}: {products.length}
+                    </td>
+                    <td className="px-4 py-4" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
           {products.length === 0 && (

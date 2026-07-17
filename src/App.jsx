@@ -14,6 +14,7 @@ import { useToast } from "./hooks/useToast.js";
 import {
   computeStats,
   matchesFilter,
+  matchesAtainCampaignFilter,
   matchesAtainFilters,
   matchesSearch,
   decodeCsvText,
@@ -69,6 +70,13 @@ export default function App() {
         isAtain ? matchesAtainFilters(product, filter, campaignFilter) : matchesFilter(product, filter),
       );
   }, [products, query, filter, campaignFilter, selectedBusiness]);
+
+  const atainChartProducts = useMemo(() => {
+    if (selectedBusiness?.id !== "atain") return [];
+    return products
+      .filter((product) => matchesSearch(product, query))
+      .filter((product) => matchesAtainCampaignFilter(product, campaignFilter));
+  }, [products, query, campaignFilter, selectedBusiness]);
 
   const stats = useMemo(
     () => computeStats(products, { isAtain: selectedBusiness?.id === "atain" }),
@@ -386,6 +394,7 @@ export default function App() {
           query={query}
           filter={filter}
           campaignFilter={campaignFilter}
+          atainChartProducts={atainChartProducts}
           products={visibleProducts}
           isLoadingProducts={isLoadingProducts}
           dataSource={dataSource}
