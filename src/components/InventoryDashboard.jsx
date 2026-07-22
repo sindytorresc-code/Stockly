@@ -44,6 +44,7 @@ export default function InventoryDashboard({
   filter,
   campaignFilter,
   atainChartProducts = [],
+  atainScopeProducts = [],
   products,
   isLoadingProducts,
   dataSource,
@@ -69,7 +70,10 @@ export default function InventoryDashboard({
         ["low", "Stock bajo"],
         ["empty", "Agotados"],
       ];
-  const activeFilterLabel = filterOptions.find(([value]) => value === filter)?.[1] ?? "Activos";
+  const activeFilterLabel =
+    campaignFilter === ATAIN_BODEGA && filter === "all"
+      ? ATAIN_BODEGA
+      : filterOptions.find(([value]) => value === filter)?.[1] ?? "Activos";
 
   return (
     <>
@@ -129,9 +133,12 @@ export default function InventoryDashboard({
           <div className="mb-8">
             <AtainAssetPieChart
               products={atainChartProducts}
+              scopeProducts={atainScopeProducts}
               activeFilter={filter}
+              campaignFilter={campaignFilter}
               theme={theme}
               onFilter={onFilter}
+              onCampaignFilter={onCampaignFilter}
             />
           </div>
         ) : (

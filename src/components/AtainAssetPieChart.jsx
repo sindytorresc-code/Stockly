@@ -1,4 +1,5 @@
-import { ATAIN_ASSET_CHART, computeAtainAssetBreakdown } from "../lib/atainStats.js";
+import { ATAIN_BODEGA } from "../data/businesses.js";
+import { ATAIN_ASSET_CHART, computeAtainAssetBreakdown, countAtainBodegaAssets } from "../lib/atainStats.js";
 
 function polarToCartesian(cx, cy, radius, angleDeg) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -26,15 +27,28 @@ function donutSlicePath(cx, cy, outerR, innerR, startAngle, endAngle) {
   ].join(" ");
 }
 
-export default function AtainAssetPieChart({ products, activeFilter, theme, onFilter }) {
+export default function AtainAssetPieChart({
+  products,
+  scopeProducts,
+  activeFilter,
+  campaignFilter,
+  theme,
+  onFilter,
+  onCampaignFilter,
+}) {
   const segments = computeAtainAssetBreakdown(products).filter((segment) => segment.count > 0);
   const total = segments.reduce((sum, segment) => sum + segment.count, 0);
+  const scopeTotal = scopeProducts.length;
+  const bodegaCount = countAtainBodegaAssets(scopeProducts);
+  const viewingBodega = campaignFilter === ATAIN_BODEGA;
   const activeSegment = segments.find((segment) => segment.key === activeFilter);
   const centerValue = activeFilter === "all" ? total : activeSegment?.count ?? 0;
   const centerLabel =
-    activeFilter === "all"
-      ? "Activos"
-      : ATAIN_ASSET_CHART.find((item) => item.key === activeFilter)?.label ?? "Activos";
+    viewingBodega && activeFilter === "all"
+      ? ATAIN_BODEGA
+      : activeFilter === "all"
+        ? "Activos"
+        : ATAIN_ASSET_CHART.find((item) => item.key === activeFilter)?.label ?? "Activos";
 
   let cursor = 0;
   const slices = segments.map((segment) => {
@@ -53,6 +67,27 @@ export default function AtainAssetPieChart({ products, activeFilter, theme, onFi
 
   return (
     <section className={`rounded-lg border p-6 ${theme.panel}`}>
+      <div className="mb-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onCampaignFilter("all")}
+          className={`h-11 rounded-lg border px-4 text-sm font-extrabold transition ${
+            !viewingBodega ? theme.accent : `${theme.panelSoft} ${theme.text} hover:opacity-90`
+          }`}
+        >
+          Todos los activos ({scopeTotal})
+        </button>
+        <button
+          type="button"
+          onClick={() => onCampaignFilter(ATAIN_BODEGA)}
+          className={`h-11 rounded-lg border px-4 text-sm font-extrabold transition ${
+            viewingBodega ? theme.accent : `${theme.panelSoft} ${theme.text} hover:opacity-90`
+          }`}
+        >
+          Bodega ({bodegaCount})
+        </button>
+      </div>
+
       <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative shrink-0">
           <svg viewBox="0 0 240 240" className="size-56" role="img" aria-label="Distribucion de activos por tipo">
@@ -110,7 +145,7 @@ export default function AtainAssetPieChart({ products, activeFilter, theme, onFi
               activeFilter === "all" ? theme.accent : `${theme.panelSoft} ${theme.text} hover:opacity-90`
             }`}
           >
-            <span className="font-extrabold">Todos los tipos</span>
+            <span className="font-extrabold">{viewingBodega ? "Todos en bodega" : "Todos los tipos"}</span>
             <span className="text-lg font-extrabold">{total}</span>
           </button>
         </div>

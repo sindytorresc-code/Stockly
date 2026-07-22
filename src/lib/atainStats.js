@@ -21,3 +21,11 @@ export function computeAtainAssetBreakdown(products) {
     count: counts[key],
   }));
 }
+
+export function countAtainBodegaAssets(products) {
+  return products.filter((product) => String(product.brand || "").trim().toLowerCase() === "bodega").length;
+}
+
+export function isAtainInBodega(product) {
+  return String(product?.brand || "").trim().toLowerCase() === "bodega";
+}

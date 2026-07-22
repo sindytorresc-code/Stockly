@@ -78,6 +78,11 @@ export default function App() {
       .filter((product) => matchesAtainCampaignFilter(product, campaignFilter));
   }, [products, query, campaignFilter, selectedBusiness]);
 
+  const atainScopeProducts = useMemo(() => {
+    if (selectedBusiness?.id !== "atain") return [];
+    return products.filter((product) => matchesSearch(product, query));
+  }, [products, query, selectedBusiness]);
+
   const stats = useMemo(
     () => computeStats(products, { isAtain: selectedBusiness?.id === "atain" }),
     [products, selectedBusiness],
@@ -395,6 +400,7 @@ export default function App() {
           filter={filter}
           campaignFilter={campaignFilter}
           atainChartProducts={atainChartProducts}
+          atainScopeProducts={atainScopeProducts}
           products={visibleProducts}
           isLoadingProducts={isLoadingProducts}
           dataSource={dataSource}

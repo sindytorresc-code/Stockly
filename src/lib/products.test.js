@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeAtainAssetBreakdown } from "./atainStats.js";
+import { computeAtainAssetBreakdown, countAtainBodegaAssets } from "./atainStats.js";
 import {
   computeStats,
   deriveTag,
@@ -295,5 +295,18 @@ describe("computeAtainAssetBreakdown", () => {
     expect(breakdown.find((item) => item.key === "desktop")?.count).toBe(2);
     expect(breakdown.find((item) => item.key === "mouse")?.count).toBe(1);
     expect(breakdown.find((item) => item.key === "headset")?.count).toBe(0);
+  });
+});
+
+describe("countAtainBodegaAssets", () => {
+  it("counts only assets marked as bodega", () => {
+    expect(
+      countAtainBodegaAssets([
+        { brand: "Bodega" },
+        { brand: "Bodega" },
+        { brand: "" },
+        { campaign: "TRN1" },
+      ]),
+    ).toBe(2);
   });
 });
