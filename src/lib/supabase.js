@@ -118,7 +118,7 @@ export function dbProductToApp(row) {
   };
 }
 
-export function appProductToDb(product, clientId) {
+export function appProductToDb(product, clientId, { includeId = false } = {}) {
   const row = {
     client_id: clientId,
     name: product.name,
@@ -134,8 +134,9 @@ export function appProductToDb(product, clientId) {
     campaign: product.campaign || "",
     comments: product.comments || "",
     image_url: product.image || null,
+    updated_at: new Date().toISOString(),
   };
-  if (product.dbId) row.id = product.dbId;
+  if (includeId && product.dbId) row.id = product.dbId;
   return row;
 }
 
@@ -170,7 +171,31 @@ export async function upsertSupabaseProductsInBatches(clientId, products) {
   return synced;
 }
 
+export async function updateSupabaseProduct(clientId, product) {
+  if (!product.dbId) {
+    throw new Error("No se puede actualizar un activo sin id de base de datos");
+  }
+
+  const payload = appProductToDb(product, clientId);
+  const rows = await supabaseRequest(`/products?id=eq.${product.dbId}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!rows?.length) {
+    throw new Error("Supabase no actualizo el activo");
+  }
+
+  return dbProductToApp(rows[0]);
+}
+
 export async function upsertSupabaseProduct(clientId, product) {
+  // Edits must PATCH by id so comments/status always persist.
+  if (product.dbId) {
+    return updateSupabaseProduct(clientId, product);
+  }
+
   const rows = await supabaseRequest("/products?on_conflict=client_id,code", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },

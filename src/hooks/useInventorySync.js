@@ -5,17 +5,29 @@ import {
   deleteAllSupabaseProducts,
   deleteSupabaseProduct,
   ensureSupabaseClient,
+  fetchSupabaseProducts,
   initSupabase,
   isSupabaseConfigured,
   seedSupabaseProductsIfEmpty,
   upsertSupabaseProduct,
   upsertSupabaseProductsInBatches,
+  dbProductToApp,
 } from "../lib/supabase.js";
 import { formatSupabaseError } from "../lib/supabaseErrors.js";
 import { mergeProductsByCode } from "../lib/products.js";
 
 async function canUseSupabase() {
   return Boolean(await initSupabase());
+}
+
+function sameProduct(a, b) {
+  if (!a || !b) return false;
+  if (a.dbId && b.dbId) return a.dbId === b.dbId;
+  return String(a.code || "").trim() === String(b.code || "").trim();
+}
+
+function withoutProduct(list, product) {
+  return list.filter((item) => !sameProduct(item, product));
 }
 
 export function useInventorySync(showToast) {
@@ -39,6 +51,7 @@ export function useInventorySync(showToast) {
       const nextList = typeof updater === "function" ? updater(currentList) : updater;
       const next = { ...current, [businessId]: nextList };
 
+      // Keep localStorage as fallback cache only when Supabase is unavailable.
       if (!isSupabaseConfigured()) {
         try {
           saveProducts(next);
@@ -63,6 +76,22 @@ export function useInventorySync(showToast) {
     return client.id;
   }, []);
 
+  const refreshFromSupabase = useCallback(
+    async (business, clientId) => {
+      const rows = await fetchSupabaseProducts(clientId);
+      const products = rows.map(dbProductToApp);
+      updateBusinessProducts(business.id, products);
+      // Drop stale local cache so deleted codes cannot resurrect after reload.
+      try {
+        localStorage.removeItem("inventory-products-react");
+      } catch {
+        /* ignore */
+      }
+      return products;
+    },
+    [updateBusinessProducts],
+  );
+
   const loadInventory = useCallback(
     async (business) => {
       if (!(await canUseSupabase())) {
@@ -77,8 +106,8 @@ export function useInventorySync(showToast) {
       setIsLoadingProducts(true);
       try {
         const clientId = await getClientIdForBusiness(business);
-        const products = await seedSupabaseProductsIfEmpty(clientId, business.products);
-        updateBusinessProducts(business.id, products);
+        await seedSupabaseProductsIfEmpty(clientId, business.products);
+        await refreshFromSupabase(business, clientId);
         setDataSource("Supabase");
       } catch (error) {
         console.error(error);
@@ -88,7 +117,7 @@ export function useInventorySync(showToast) {
         setIsLoadingProducts(false);
       }
     },
-    [getClientIdForBusiness, showToast, updateBusinessProducts],
+    [getClientIdForBusiness, refreshFromSupabase, showToast],
   );
 
   const saveProduct = useCallback(
@@ -97,23 +126,22 @@ export function useInventorySync(showToast) {
         const savedProduct = { ...product, dbId: editingProduct?.dbId };
         updateBusinessProducts(business.id, (currentProducts) =>
           editingProduct
-            ? currentProducts.map((item) => (item.code === editingProduct.code ? savedProduct : item))
-            : [savedProduct, ...currentProducts.filter((item) => item.code !== savedProduct.code)],
+            ? currentProducts.map((item) => (sameProduct(item, editingProduct) ? savedProduct : item))
+            : [savedProduct, ...withoutProduct(currentProducts, savedProduct)],
         );
         return savedProduct;
       }
 
       const clientId = await getClientIdForBusiness(business);
-      const savedProduct = await upsertSupabaseProduct(clientId, product);
-      updateBusinessProducts(business.id, (currentProducts) =>
-        editingProduct
-          ? currentProducts.map((item) => (item.code === editingProduct.code ? savedProduct : item))
-          : [savedProduct, ...currentProducts.filter((item) => item.code !== savedProduct.code)],
-      );
+      const payload = { ...product, dbId: product.dbId || editingProduct?.dbId };
+      const savedProduct = await upsertSupabaseProduct(clientId, payload);
+
+      // Re-read from DB so UI always matches what was persisted.
+      await refreshFromSupabase(business, clientId);
       setDataSource("Supabase");
       return savedProduct;
     },
-    [getClientIdForBusiness, updateBusinessProducts],
+    [getClientIdForBusiness, refreshFromSupabase, updateBusinessProducts],
   );
 
   const deleteProduct = useCallback(
@@ -121,23 +149,22 @@ export function useInventorySync(showToast) {
       if (await canUseSupabase()) {
         const clientId = await getClientIdForBusiness(business);
         await deleteSupabaseProduct(clientId, product);
+        await refreshFromSupabase(business, clientId);
         setDataSource("Supabase");
+        return;
       }
 
-      updateBusinessProducts(business.id, (currentProducts) =>
-        currentProducts.filter((item) => item.code !== product.code),
-      );
+      updateBusinessProducts(business.id, (currentProducts) => withoutProduct(currentProducts, product));
     },
-    [getClientIdForBusiness, updateBusinessProducts],
+    [getClientIdForBusiness, refreshFromSupabase, updateBusinessProducts],
   );
 
   const importProducts = useCallback(
     async (business, imported) => {
       if ((await canUseSupabase()) && imported.length) {
         const clientId = await getClientIdForBusiness(business);
-        const rows = await upsertSupabaseProductsInBatches(clientId, imported);
-        const synced = rows.length ? rows : imported;
-        updateBusinessProducts(business.id, (currentProducts) => mergeProductsByCode(currentProducts, synced));
+        await upsertSupabaseProductsInBatches(clientId, imported);
+        await refreshFromSupabase(business, clientId);
         setDataSource("Supabase");
         return imported.length;
       }
@@ -145,7 +172,7 @@ export function useInventorySync(showToast) {
       updateBusinessProducts(business.id, (currentProducts) => mergeProductsByCode(currentProducts, imported));
       return imported.length;
     },
-    [getClientIdForBusiness, updateBusinessProducts],
+    [getClientIdForBusiness, refreshFromSupabase, updateBusinessProducts],
   );
 
   const clearAllProducts = useCallback(
@@ -153,12 +180,14 @@ export function useInventorySync(showToast) {
       if (await canUseSupabase()) {
         const clientId = await getClientIdForBusiness(business);
         await deleteAllSupabaseProducts(clientId);
+        await refreshFromSupabase(business, clientId);
         setDataSource("Supabase");
+        return;
       }
 
       updateBusinessProducts(business.id, []);
     },
-    [getClientIdForBusiness, updateBusinessProducts],
+    [getClientIdForBusiness, refreshFromSupabase, updateBusinessProducts],
   );
 
   return {

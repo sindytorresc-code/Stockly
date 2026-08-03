@@ -234,11 +234,14 @@ export default function App() {
       return;
     }
 
+    const normalizedCode = String(product.code || "").trim();
     const duplicate = products.some((item) => {
-      if (item.code !== product.code) return false;
+      if (String(item.code || "").trim() !== normalizedCode) return false;
       // Same product being edited (by db id or by original code).
       if (editingProduct?.dbId && item.dbId === editingProduct.dbId) return false;
-      if (editingProduct && item.code === editingProduct.code) return false;
+      if (editingProduct && String(item.code || "").trim() === String(editingProduct.code || "").trim()) {
+        return false;
+      }
       return true;
     });
     if (duplicate) {
