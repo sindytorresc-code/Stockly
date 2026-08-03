@@ -234,9 +234,13 @@ export default function App() {
       return;
     }
 
-    const duplicate = products.some(
-      (item) => item.code === product.code && item.code !== editingProduct?.code,
-    );
+    const duplicate = products.some((item) => {
+      if (item.code !== product.code) return false;
+      // Same product being edited (by db id or by original code).
+      if (editingProduct?.dbId && item.dbId === editingProduct.dbId) return false;
+      if (editingProduct && item.code === editingProduct.code) return false;
+      return true;
+    });
     if (duplicate) {
       showToast("Ya existe un producto con ese codigo");
       return;

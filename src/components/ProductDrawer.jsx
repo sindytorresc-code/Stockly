@@ -55,7 +55,15 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
           ) : (
             <ModalField theme={theme} label="Categoria *" name="category" defaultValue={product?.category} required className="sm:col-span-3" />
           )}
-          <ModalField theme={theme} label="Serial / Codigo *" name="code" defaultValue={product?.code} disabled={Boolean(product)} required className="sm:col-span-3" />
+          <ModalField
+            theme={theme}
+            label="Serial / Codigo *"
+            name="code"
+            defaultValue={product?.code}
+            readOnly={Boolean(product)}
+            required
+            className={`sm:col-span-3${product ? " opacity-80" : ""}`}
+          />
 
           {isAtain ? (
             <>

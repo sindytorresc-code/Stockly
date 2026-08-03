@@ -119,7 +119,7 @@ export function dbProductToApp(row) {
 }
 
 export function appProductToDb(product, clientId) {
-  return {
+  const row = {
     client_id: clientId,
     name: product.name,
     code: product.code,
@@ -135,6 +135,8 @@ export function appProductToDb(product, clientId) {
     comments: product.comments || "",
     image_url: product.image || null,
   };
+  if (product.dbId) row.id = product.dbId;
+  return row;
 }
 
 export async function upsertSupabaseProducts(clientId, products) {

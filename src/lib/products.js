@@ -115,10 +115,14 @@ export function dedupeImportProductsByCode(products) {
 export function parseProductForm(form, editingProduct, isAtain) {
   const userTag = String(form.get("tag") || editingProduct?.tag || (isAtain ? "Asignado" : "En stock"));
   const stock = isAtain ? 1 : Number(form.get("stock"));
+  // Disabled inputs are omitted from FormData; fall back to the product being edited.
+  const formCode = form.get("code");
+  const code = String(formCode != null && formCode !== "" ? formCode : editingProduct?.code || "").trim();
 
   return {
+    dbId: editingProduct?.dbId,
     name: String(form.get("name")).trim(),
-    code: String(form.get("code")).trim(),
+    code,
     category: String(form.get("category")).trim(),
     brand: isAtain ? (form.get("inBodega") === "on" ? "Bodega" : "") : String(form.get("brand") || "").trim(),
     price: isAtain ? Number(editingProduct?.price || 0) : Number(form.get("price")),

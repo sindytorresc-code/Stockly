@@ -106,6 +106,28 @@ describe("parseProductForm", () => {
     const product = parseProductForm(form, null, false);
     expect(product.tag).toBe("Reparacion");
   });
+
+  it("keeps editing code when FormData omits disabled code field", () => {
+    const form = new FormData();
+    form.set("name", "Mouse Dell");
+    form.set("category", "Mouse");
+    form.set("spot", "");
+    form.set("campaign", "");
+    form.set("tag", "En stock");
+    form.set("comments", "mancha de pintura");
+    form.set("inBodega", "on");
+
+    const product = parseProductForm(
+      form,
+      { dbId: "abc-123", code: "6545562215", price: 0, tag: "En stock" },
+      true,
+    );
+
+    expect(product.code).toBe("6545562215");
+    expect(product.dbId).toBe("abc-123");
+    expect(product.comments).toBe("mancha de pintura");
+    expect(product.brand).toBe("Bodega");
+  });
 });
 
 describe("parseAtainAssetCsv", () => {
