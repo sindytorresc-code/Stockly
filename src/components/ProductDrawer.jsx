@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { X } from "lucide-react";
 import { atainCampaigns, ATAIN_ASSET_CATEGORIES, ATAIN_BODEGA, PRODUCT_TAGS } from "../data/businesses.js";
 import { useEscapeKey } from "../hooks/useEscapeKey.js";
@@ -7,7 +8,7 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
   useEscapeKey(onClose);
   const title = product ? "Editar activo" : "Agregar activo";
   const isAtain = business?.id === "atain";
-  const inBodega = product?.brand === ATAIN_BODEGA;
+  const [inBodega, setInBodega] = useState(product?.brand === ATAIN_BODEGA);
   const borderClass = theme.formBorder || "border-pink-300 focus:border-pink-500 focus:ring-pink-200";
 
   return (
@@ -60,11 +61,11 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
             <>
               <ModalField
                 theme={theme}
-                label="Spot *"
+                label={`Spot${inBodega ? "" : " *"}`}
                 name="spot"
                 defaultValue={product?.spot || ""}
-                placeholder="Ubicacion del activo en la campana"
-                required
+                placeholder={inBodega ? "Opcional para activos en bodega" : "Ubicacion del activo en la campana"}
+                required={!inBodega}
                 className="sm:col-span-3"
               />
               <label className="grid min-w-0 gap-2 sm:col-span-3">
@@ -87,7 +88,8 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
                 <input
                   type="checkbox"
                   name="inBodega"
-                  defaultChecked={inBodega}
+                  checked={inBodega}
+                  onChange={(event) => setInBodega(event.target.checked)}
                   className="size-4 accent-blue-500"
                 />
                 <span className="text-sm font-bold">Activo en bodega</span>

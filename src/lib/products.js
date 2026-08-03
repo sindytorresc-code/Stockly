@@ -142,8 +142,8 @@ export function validateProduct(product, isAtain) {
       return "Precio invalido";
     }
   } else {
-    if (!product.spot) return "Completa el spot del activo";
     const inBodega = String(product.brand || "").trim().toLowerCase() === "bodega";
+    if (!inBodega && !product.spot) return "Completa el spot del activo";
     if (!inBodega && !product.campaign) return "Selecciona la campana";
     const allowed = ["desktop", "pantalla", "headset", "mouse", "teclado"];
     if (!allowed.includes(String(product.category || "").trim().toLowerCase())) {
