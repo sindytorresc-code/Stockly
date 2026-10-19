@@ -5,6 +5,7 @@ import {
   requireSupabaseConfig,
 } from "./supabaseConfig.js";
 import { normalizeCompanyAccessCode } from "./companyAccessCode.js";
+import { buildGoogleAuthorizeUrl } from "./googleOAuth.js";
 
 export { hasSupabaseConfig, initSupabase, isSupabaseConfigured };
 
@@ -80,12 +81,7 @@ export async function signInWithGoogle(companyCode) {
   const redirectTo = `${window.location.origin}${window.location.pathname}`;
   sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
   sessionStorage.setItem(COMPANY_CODE_KEY, normalizedCode);
-  const authorize = new URL(`${config.url}/auth/v1/authorize`);
-  authorize.searchParams.set("provider", "google");
-  authorize.searchParams.set("redirect_to", redirectTo);
-  authorize.searchParams.set("code_challenge", challenge);
-  authorize.searchParams.set("code_challenge_method", "s256");
-  window.location.assign(authorize.toString());
+  window.location.assign(buildGoogleAuthorizeUrl({ supabaseUrl: config.url, redirectTo, codeChallenge: challenge }));
 }
 
 export async function completeGoogleSignIn() {
