@@ -9,7 +9,11 @@ npm install
 npm run dev
 ```
 
-## Codigos de acceso
+## Inicio de sesión
+
+Para activar el modo protegido configura `VITE_REQUIRE_AUTH=true` junto con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`. Los usuarios inician sesión con Supabase Auth; el token se conserva únicamente en `sessionStorage`. Sin esa variable, la app mantiene el modo demo por PIN y almacenamiento local ya existente.
+
+## Códigos demo
 
 - ATAIN: `1234`
 - Sabor Fresco: `2026`
@@ -26,7 +30,5 @@ nombre,codigo,categoria,precio,existencias,estado,comentarios
 
 ## Base de datos
 
-La version actual guarda temporalmente en `localStorage`.
-
-Para produccion recomiendo **Supabase con PostgreSQL**. Ya deje una guia en `DATABASE.md` y un esquema inicial en `database/schema.sql`.
+La app admite Supabase con PostgreSQL. Consulta `DATABASE.md` para configurar el esquema y activar las políticas por empresa.
 

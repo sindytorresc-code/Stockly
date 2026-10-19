@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { businesses } from "./data/businesses.js";
+import { businesses as initialBusinesses } from "./data/businesses.js";
 import ClientSelector from "./components/ClientSelector.jsx";
 import ConfirmDialog from "./components/ui/ConfirmDialog.jsx";
 import InventoryDashboard from "./components/InventoryDashboard.jsx";
@@ -28,8 +28,15 @@ import {
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
+import { createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, signOut } from "./lib/supabase.js";
+import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
+import SignIn from "./components/SignIn.jsx";
+import AccessManager from "./components/AccessManager.jsx";
 
 export default function App() {
+  const [businesses, setBusinesses] = useState(initialBusinesses);
+  const authRequired = import.meta.env.VITE_REQUIRE_AUTH === "true";
+  const [authenticated, setAuthenticated] = useState(!authRequired || hasAuthenticatedSession());
   const initialRouteBusiness = businessFromPath();
   const { toast, showToast } = useToast();
   const {
@@ -41,12 +48,13 @@ export default function App() {
     deleteProduct,
     importProducts,
     clearAllProducts,
+    loadMovements,
   } = useInventorySync(showToast);
   const { pinsByBusiness, pinsReady, loadActivePin, savePin, verifyActivePin, hasRemotePins } = usePinSync(showToast);
 
   const [selectedBusiness, setSelectedBusiness] = useState(null);
-  const [pinBusiness, setPinBusiness] = useState(initialRouteBusiness);
-  const [pinLoading, setPinLoading] = useState(Boolean(initialRouteBusiness));
+  const [pinBusiness, setPinBusiness] = useState(authRequired ? null : initialRouteBusiness);
+  const [pinLoading, setPinLoading] = useState(!authRequired && Boolean(initialRouteBusiness));
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
   const [query, setQuery] = useState("");
@@ -58,8 +66,11 @@ export default function App() {
   const [atainImportDraft, setAtainImportDraft] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [accessCompany, setAccessCompany] = useState(null);
 
-  const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0].theme;
+  const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0]?.theme || initialBusinesses[0].theme;
   const products = selectedBusiness ? productsByBusiness[selectedBusiness.id] || [] : [];
 
   const visibleProducts = useMemo(() => {
@@ -94,8 +105,72 @@ export default function App() {
     setQuery("");
   }, []);
 
+  const refreshAuthorizedBusinesses = useCallback(async () => {
+    const rows = await fetchSupabaseClients();
+    const mapped = rows.map((row) => {
+      const existing = initialBusinesses.find((item) => item.id === row.slug);
+      return existing ? { ...existing, name: row.name, type: row.business_type, description: row.description || "" } : {
+        id: row.slug, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package",
+        cardGradient: "from-blue-600 to-cyan-500", pin: "", products: [], theme: initialBusinesses[0].theme,
+      };
+    });
+    setBusinesses(mapped);
+    if (authRequired) {
+      const routeSlug = decodeURIComponent(window.location.pathname.split("/").filter(Boolean).at(-1) || "").toLowerCase();
+      const routeBusiness = mapped.find((business) => business.id.toLowerCase() === routeSlug);
+      if (routeBusiness) setSelectedBusiness(routeBusiness);
+    }
+  }, [authRequired]);
+  useEffect(() => {
+    if (authRequired && authenticated) refreshAuthorizedBusinesses().catch((error) => { console.error(error); setAuthenticated(false); signOut(); });
+  }, [authRequired, authenticated, refreshAuthorizedBusinesses]);
+
+  const handleCreateBusiness = useCallback(async ({ name, type, description }) => {
+    if (!(await initSupabase())) throw new Error("Configura Supabase para guardar empresas de forma persistente.");
+    const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (!slug || businesses.some((business) => business.id === slug)) throw new Error("Ya existe una empresa con ese nombre.");
+    const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon: "package", cardGradient: "from-blue-600 to-cyan-500", pin: "", products: [], theme: initialBusinesses[0].theme };
+    await createSupabaseBusiness(business);
+    if (authRequired) await refreshAuthorizedBusinesses();
+    else setBusinesses((current) => [...current, business]);
+    showToast("Empresa guardada en Supabase");
+  }, [businesses, showToast, authRequired, refreshAuthorizedBusinesses]);
+
+  const handleExport = useCallback(async () => {
+    if (!selectedBusiness) return;
+    try {
+      const movements = await loadMovements(selectedBusiness);
+      exportBusinessWorkbook(selectedBusiness, products, movements);
+      showToast("Respaldo Excel descargado");
+    } catch (error) {
+      console.error(error);
+      showToast(formatSupabaseError(error, "No pude cargar los movimientos para el respaldo"));
+    }
+  }, [selectedBusiness, products, loadMovements, showToast]);
+
+  const handleToggleHistory = useCallback(async () => {
+    if (historyOpen) { setHistoryOpen(false); return; }
+    try { setHistoryRows(await loadMovements(selectedBusiness)); setHistoryOpen(true); }
+    catch (error) { console.error(error); showToast(formatSupabaseError(error, "No pude cargar el historial")); }
+  }, [historyOpen, loadMovements, selectedBusiness, showToast]);
+
+  const handleManageAccess = useCallback(async () => {
+    try {
+      const client = await fetchSupabaseClient(selectedBusiness.id);
+      if (!client) throw new Error("No se encontró la empresa en la base de datos.");
+      setAccessCompany({ id: client.id, name: selectedBusiness.name });
+    } catch (error) { showToast(formatSupabaseError(error, "No pude abrir la administración de usuarios")); }
+  }, [selectedBusiness, showToast]);
+
   const openPin = useCallback(
     async (business) => {
+      if (authRequired) {
+        setSelectedBusiness(business);
+        setPinBusiness(null);
+        navigateToPath(businessPath(business), true);
+        resetSessionFilters();
+        return;
+      }
       navigateToPath(businessPath(business));
       setPinBusiness(business);
       setPin("");
@@ -110,7 +185,7 @@ export default function App() {
         setPinLoading(false);
       }
     },
-    [loadActivePin, showToast],
+    [loadActivePin, showToast, authRequired, resetSessionFilters],
   );
 
   const closePin = useCallback(() => {
@@ -184,12 +259,12 @@ export default function App() {
   }, [selectedBusiness, loadInventory]);
 
   useEffect(() => {
-    if (!initialRouteBusiness) return;
+    if (!initialRouteBusiness || authRequired) return;
 
     loadActivePin(initialRouteBusiness.id)
       .catch((error) => console.error(error))
       .finally(() => setPinLoading(false));
-  }, [initialRouteBusiness, loadActivePin]);
+  }, [initialRouteBusiness, loadActivePin, authRequired]);
 
   useEffect(() => {
     if (!pinBusiness) return undefined;
@@ -396,8 +471,8 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.appBg} ${theme.text}`}>
-      {!selectedBusiness ? (
-        <ClientSelector onSelect={openPin} />
+      {authRequired && !authenticated ? <SignIn onSignedIn={() => setAuthenticated(true)} /> : !selectedBusiness ? (
+        <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} />
       ) : (
         <InventoryDashboard
           business={selectedBusiness}
@@ -419,8 +494,13 @@ export default function App() {
           onEdit={openProductForm}
           onDelete={setProductToDelete}
           onImport={handleImportCsv}
-          onChangePassword={() => setPasswordModalOpen(true)}
+          onChangePassword={authRequired ? undefined : () => setPasswordModalOpen(true)}
           onClearAll={() => setClearAllConfirmOpen(true)}
+          onExport={handleExport}
+          movements={historyRows}
+          showHistory={historyOpen}
+          onToggleHistory={handleToggleHistory}
+          onManageAccess={authRequired ? handleManageAccess : undefined}
         />
       )}
 
@@ -434,6 +514,8 @@ export default function App() {
           onKey={pressPinKey}
         />
       )}
+
+      {accessCompany && <AccessManager clientId={accessCompany.id} businessName={accessCompany.name} onClose={() => setAccessCompany(null)} />}
 
       {drawerOpen && selectedBusiness && (
         <ProductDrawer

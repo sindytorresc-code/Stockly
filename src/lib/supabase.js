@@ -7,6 +7,21 @@ import {
 
 export { hasSupabaseConfig, initSupabase, isSupabaseConfigured };
 
+let accessToken = typeof sessionStorage === "undefined" ? null : sessionStorage.getItem("stockly-access-token");
+export function hasAuthenticatedSession() { return Boolean(accessToken); }
+export async function signInWithPassword(email, password) {
+  const config = await requireSupabaseConfig();
+  const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
+    method: "POST", headers: { apikey: config.key, "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.access_token) throw new Error(result.msg || result.message || "Correo o contraseña incorrectos");
+  accessToken = result.access_token;
+  sessionStorage.setItem("stockly-access-token", accessToken);
+  return result.user;
+}
+export function signOut() { accessToken = null; sessionStorage.removeItem("stockly-access-token"); }
+
 async function supabaseRequest(path, options = {}) {
   const config = await requireSupabaseConfig();
 
@@ -15,7 +30,7 @@ async function supabaseRequest(path, options = {}) {
     cache: "no-store",
     headers: {
       apikey: config.key,
-      Authorization: `Bearer ${config.key}`,
+      Authorization: `Bearer ${accessToken || config.key}`,
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
@@ -36,6 +51,10 @@ export async function fetchSupabaseClient(slug) {
     `/clients?slug=eq.${encodeURIComponent(slug)}&select=id,slug`,
   );
   return rows?.[0] || null;
+}
+
+export async function fetchSupabaseClients() {
+  return supabaseRequest("/clients?select=id,slug,name,business_type,description,icon,theme&order=name.asc");
 }
 
 export async function ensureSupabaseClient(business) {
@@ -97,6 +116,40 @@ export async function fetchSupabaseProducts(clientId) {
   return supabaseRequest(
     `/products?client_id=eq.${clientId}&select=*&order=created_at.desc`,
   );
+}
+
+export async function createSupabaseBusiness(business) {
+  const rows = await supabaseRequest("/rpc/create_company", {
+    method: "POST",
+    body: JSON.stringify({ company_slug: business.id, company_name: business.name, company_type: business.type, company_description: business.description }),
+  });
+  return rows || null;
+}
+
+export async function fetchSupabaseMovements(clientId) {
+  const result = [];
+  for (let offset = 0; ; offset += 1000) {
+    const page = await supabaseRequest(`/inventory_movements?client_id=eq.${encodeURIComponent(clientId)}&select=created_at,movement_type,product_name,product_code,quantity,notes&order=created_at.desc`, {
+      headers: { Range: `${offset}-${offset + 999}` },
+    });
+    result.push(...(page || []));
+    if (!page || page.length < 1000) return result;
+  }
+}
+
+export async function fetchAccessConfiguration(clientId) {
+  const [roles, memberships] = await Promise.all([
+    supabaseRequest("/roles?select=id,name&order=name.asc"),
+    supabaseRequest(`/client_memberships?client_id=eq.${encodeURIComponent(clientId)}&select=user_id,role_id,active&order=created_at.asc`),
+  ]);
+  return { roles, memberships };
+}
+
+export async function saveClientMembership(clientId, userId, roleId) {
+  return supabaseRequest("/client_memberships?on_conflict=client_id,user_id", {
+    method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({ client_id: clientId, user_id: userId, role_id: roleId, active: true }),
+  });
 }
 
 export function dbProductToApp(row) {

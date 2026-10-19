@@ -1,53 +1,39 @@
-﻿# Base de datos
+# Base de datos y despliegue
 
-La app usa Supabase cuando las variables de entorno estan configuradas. Si Supabase no responde o las tablas no existen, Stockly usa `localStorage` como respaldo temporal.
+Stockly usa Supabase Auth y PostgreSQL en el modo protegido. `database/schema.sql` conserva la estructura anterior para demo y `database/production-security.sql` añade empresas/membresías, usuarios, roles, permisos, categorías, inventario, asignaciones, movimientos, auditoría e índices. Las claves foráneas y restricciones de unicidad evitan duplicados dentro de cada empresa; RLS limita consultas a las membresías y permisos del usuario autenticado.
 
-## Proyecto configurado
+## Preparar un proyecto Supabase
 
-URL del proyecto:
+1. En un proyecto nuevo ejecuta `database/schema.sql` en SQL Editor.
+2. Ejecuta `database/production-security.sql`. Este archivo elimina las políticas públicas de demo si estaban instaladas.
+3. En Supabase Dashboard abre **Authentication → Users → Add user**. Elige **Create new user** para el primer administrador, o **Send invitation** para enviar una invitación a cada persona. La invitación y el establecimiento de contraseña ocurren en Supabase Auth; Stockly no envía correos. Copia el UUID que aparece en la fila del usuario.
+4. Vincula el primer usuario a una empresa como `admin` desde **SQL Editor**. Sustituye el UUID y el `slug` de negocio:
 
-```bash
-VITE_SUPABASE_URL=https://ashgqegyqnfwjytdsrzn.supabase.co
+```sql
+insert into client_memberships(client_id, user_id, role_id)
+select c.id, 'UUID-DEL-USUARIO'::uuid, r.id
+from clients c cross join roles r
+where c.slug = 'atain' and r.name = 'admin'
+on conflict (client_id, user_id) do update set role_id = excluded.role_id, active = true;
 ```
 
-La `anon public key` debe ir en `.env` como:
+Repite el vínculo para las empresas que le correspondan. Las empresas nuevas se crean desde Stockly y el usuario que las crea recibe el rol admin.
 
-```bash
-VITE_SUPABASE_ANON_KEY=tu_anon_public_key
-```
+Para el resto de usuarios, repite la consulta y cambia `r.name` a `manager` o `viewer` según los permisos que necesiten. Después, un administrador puede usar **Usuarios y roles** en Stockly para asignar roles a usuarios Auth ya creados, pegando su UUID. El usuario debe existir primero en Authentication.
 
-## Paso obligatorio
+En el proyecto real de Stockly ya se ejecutaron ambos SQL. Hay 4 empresas y 138 productos, pero todavía no hay usuarios de Auth ni membresías. El esquema existente también tenía una tabla `roles` previa; la migración de producción agrega el campo faltante antes de asignar los roles nuevos. La migración reemplaza las políticas anteriores de `clients`, `products` y `roles`, y deja las tablas legadas `users`/`user_roles` sin acceso desde anon/authenticated.
 
-Antes de que la web guarde productos en Supabase debes ejecutar SQL en Supabase:
+5. Configura `.env` a partir de `.env.example` y establece `VITE_REQUIRE_AUTH=true`, `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`. Reinicia Vite después de cambiar variables.
+6. Para GitHub Pages, configura las variables de Actions `SUPABASE_URL` y `SUPABASE_ANON_KEY` en **Settings → Secrets and variables → Actions → Variables** del repositorio. El workflow valida que existan y compila con `VITE_REQUIRE_AUTH=true`. La clave `anon` está diseñada para el cliente web y será visible en el bundle publicado; su seguridad depende de RLS. Nunca pongas la `service_role key` en el frontend ni en Actions variables.
+7. En **Settings → Pages**, confirma que la fuente de publicación sea GitHub Actions. El push a `main` ejecuta las pruebas, compila y publica; también se puede iniciar `Deploy to GitHub Pages` manualmente desde Actions.
+8. No ejecutes `database/public-demo-policies.sql` en producción.
 
-1. Entra a Supabase.
-2. Abre `SQL Editor`.
-3. Copia y ejecuta todo el contenido de `database/schema.sql`.
-4. Copia y ejecuta todo el contenido de `database/public-demo-policies.sql`.
+La pantalla Usuarios y roles muestra los miembros de la empresa y permite asignarles un rol usando el UUID de Auth. Invita al usuario desde Supabase Auth primero. La política de membresías permite esta acción solo a administradores de esa empresa. Las operaciones de productos se registran mediante un trigger y el historial/exportación solo lee movimientos visibles bajo RLS.
 
-`schema.sql` crea:
+## Modo demo
 
-- `clients`
-- `products`
-- columnas extra como `brand`, `purchase_price`, `min_stock`, `spot` y `campaign`
-- clientes iniciales: `atain`, `sabor`, `vogue`, `mara`
+Sin `VITE_REQUIRE_AUTH=true`, se conserva el acceso antiguo por PIN y el respaldo local. `database/public-demo-policies.sql` concede acceso público y solo sirve para demostraciones sin datos sensibles. El PIN antiguo no es autenticación de producción.
 
-`public-demo-policies.sql` crea politicas RLS para que la app publicada pueda leer, crear, editar y borrar usando la `anon public key`.
+## Respaldo Excel
 
-## Como funciona ahora
-
-- Al entrar a un cliente, Stockly busca sus productos en Supabase.
-- Si no hay productos, siembra los productos de ejemplo.
-- Agregar, editar, eliminar e importar CSV intentan guardar en Supabase.
-- Si Supabase falla, se usa `localStorage` como respaldo.
-
-## Claves de acceso
-
-Las claves de 4 digitos se guardan en Supabase (`clients.pin_hash`) para que funcionen en todos los dispositivos. Al cambiar la clave desde cualquier negocio, se actualiza en la base de datos.
-
-## Seguridad
-
-La `anon public key` puede vivir en frontend. La `service_role key` nunca debe ponerse en la app.
-
-`public-demo-policies.sql` esta pensado para demo publica. Para produccion real, lo ideal es migrar el PIN a Supabase Auth o una Edge Function que valide hashes del lado servidor, y usar politicas por usuario/cliente.
-
+Exportar Excel genera un libro `.xls` XML compatible con Excel/LibreOffice y sus hojas Empresa, Inventario, Dashboard y Movimientos. En Supabase incluye todas las páginas del historial accesibles para la sesión. En modo local incluye empresa/inventario/dashboard y deja movimientos vacío porque el modo demo no registra auditoría remota.

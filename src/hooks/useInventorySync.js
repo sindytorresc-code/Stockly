@@ -12,6 +12,7 @@ import {
   upsertSupabaseProduct,
   upsertSupabaseProductsInBatches,
   dbProductToApp,
+  fetchSupabaseMovements,
 } from "../lib/supabase.js";
 import { formatSupabaseError } from "../lib/supabaseErrors.js";
 import { mergeProductsByCode } from "../lib/products.js";
@@ -190,6 +191,12 @@ export function useInventorySync(showToast) {
     [getClientIdForBusiness, refreshFromSupabase, updateBusinessProducts],
   );
 
+  const loadMovements = useCallback(async (business) => {
+    if (!(await canUseSupabase())) return [];
+    const clientId = await getClientIdForBusiness(business);
+    return fetchSupabaseMovements(clientId);
+  }, [getClientIdForBusiness]);
+
   return {
     productsByBusiness,
     isLoadingProducts,
@@ -199,5 +206,6 @@ export function useInventorySync(showToast) {
     deleteProduct,
     importProducts,
     clearAllProducts,
+    loadMovements,
   };
 }

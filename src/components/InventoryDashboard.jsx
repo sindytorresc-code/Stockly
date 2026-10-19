@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Database,
+  FileDown,
   DollarSign,
   Package,
   Plus,
@@ -58,6 +59,11 @@ export default function InventoryDashboard({
   onImport,
   onChangePassword,
   onClearAll,
+  onExport,
+  movements = [],
+  showHistory = false,
+  onToggleHistory,
+  onManageAccess,
 }) {
   const Icon = iconMap[business.icon];
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
@@ -100,13 +106,18 @@ export default function InventoryDashboard({
                 <Upload size={18} /> Cargar archivo
                 <input type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={onImport} />
               </label>
-              <button
+              <button type="button" onClick={onExport} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">
+                <FileDown size={18} /> Exportar Excel
+              </button>
+              <button type="button" onClick={onToggleHistory} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Historial</button>
+              {onManageAccess && <button type="button" onClick={onManageAccess} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Usuarios y roles</button>}
+              {onChangePassword && <button
                 type="button"
                 onClick={onChangePassword}
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold"
               >
                 Cambiar clave
-              </button>
+              </button>}
               <button
                 type="button"
                 onClick={onAdd}
@@ -253,6 +264,10 @@ export default function InventoryDashboard({
             </p>
           )}
         </section>
+        {showHistory && <section className={`mt-6 overflow-hidden rounded-lg border ${theme.panel}`}>
+          <h2 className={`px-4 py-3 font-extrabold ${theme.tableHead}`}>Movimientos recientes de {business.name}</h2>
+          {movements.length ? <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className={theme.tableHead}><th className="p-3 text-left">Fecha</th><th className="p-3 text-left">Operación</th><th className="p-3 text-left">Elemento</th><th className="p-3 text-left">Código</th><th className="p-3 text-right">Cantidad</th></tr></thead><tbody>{movements.map((movement, index) => <tr key={`${movement.created_at}-${index}`} className={`border-t ${theme.row}`}><td className="p-3">{new Date(movement.created_at).toLocaleString()}</td><td className="p-3">{movement.movement_type}</td><td className="p-3">{movement.product_name}</td><td className="p-3">{movement.product_code}</td><td className="p-3 text-right">{movement.quantity}</td></tr>)}</tbody></table></div> : <p className={`p-5 ${theme.muted}`}>No hay movimientos registrados todavía.</p>}
+        </section>}
       </main>
     </>
   );

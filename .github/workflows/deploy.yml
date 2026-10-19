@@ -32,7 +32,20 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate Supabase build configuration
+        env:
+          VITE_REQUIRE_AUTH: "true"
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$VITE_SUPABASE_URL"
+          test -n "$VITE_SUPABASE_ANON_KEY"
+
       - name: Build
+        env:
+          VITE_REQUIRE_AUTH: "true"
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Upload artifact
