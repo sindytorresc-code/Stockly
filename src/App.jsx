@@ -28,7 +28,7 @@ import {
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, signOut } from "./lib/supabase.js";
+import { createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, restoreAuthSession, signOut } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
@@ -37,6 +37,8 @@ export default function App() {
   const [businesses, setBusinesses] = useState(initialBusinesses);
   const authRequired = import.meta.env.VITE_REQUIRE_AUTH === "true";
   const [authenticated, setAuthenticated] = useState(!authRequired || hasAuthenticatedSession());
+  const [authReady, setAuthReady] = useState(!authRequired);
+  const [authError, setAuthError] = useState("");
   const initialRouteBusiness = businessFromPath();
   const { toast, showToast } = useToast();
   const {
@@ -69,6 +71,12 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyRows, setHistoryRows] = useState([]);
   const [accessCompany, setAccessCompany] = useState(null);
+
+  useEffect(() => {
+    if (!authRequired) return;
+    restoreAuthSession().then((valid) => { setAuthenticated(valid); setAuthReady(true); })
+      .catch((error) => { setAuthError(error.message || "No se pudo restaurar la sesión."); setAuthenticated(false); setAuthReady(true); signOut(); });
+  }, [authRequired]);
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0]?.theme || initialBusinesses[0].theme;
   const products = selectedBusiness ? productsByBusiness[selectedBusiness.id] || [] : [];
@@ -122,8 +130,8 @@ export default function App() {
     }
   }, [authRequired]);
   useEffect(() => {
-    if (authRequired && authenticated) refreshAuthorizedBusinesses().catch((error) => { console.error(error); setAuthenticated(false); signOut(); });
-  }, [authRequired, authenticated, refreshAuthorizedBusinesses]);
+    if (authRequired && authReady && authenticated) refreshAuthorizedBusinesses().catch((error) => { console.error(error); setAuthenticated(false); signOut(); });
+  }, [authRequired, authReady, authenticated, refreshAuthorizedBusinesses]);
 
   const handleCreateBusiness = useCallback(async ({ name, type, description }) => {
     if (!(await initSupabase())) throw new Error("Configura Supabase para guardar empresas de forma persistente.");
@@ -471,7 +479,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.appBg} ${theme.text}`}>
-      {authRequired && !authenticated ? <SignIn onSignedIn={() => setAuthenticated(true)} /> : !selectedBusiness ? (
+      {authRequired && !authReady ? <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Restaurando sesión…</main> : authRequired && !authenticated ? <SignIn initialError={authError} onSignedIn={() => { setAuthError(""); setAuthenticated(true); }} /> : !selectedBusiness ? (
         <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} />
       ) : (
         <InventoryDashboard
