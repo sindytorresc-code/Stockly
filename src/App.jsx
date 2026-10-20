@@ -128,21 +128,42 @@ export default function App() {
       const routeBusiness = mapped.find((business) => business.id.toLowerCase() === routeSlug);
       if (routeBusiness) setSelectedBusiness(routeBusiness);
     }
+    return mapped;
   }, [authRequired]);
   useEffect(() => {
     if (authRequired && authReady && authenticated) refreshAuthorizedBusinesses().catch((error) => { console.error(error); setAuthenticated(false); signOut(); });
   }, [authRequired, authReady, authenticated, refreshAuthorizedBusinesses]);
 
   const handleCreateBusiness = useCallback(async ({ name, type, description }) => {
-    if (!(await initSupabase())) throw new Error("Configura Supabase para guardar empresas de forma persistente.");
     const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (!slug || businesses.some((business) => business.id === slug)) throw new Error("Ya existe una empresa con ese nombre.");
     const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon: "package", cardGradient: "from-blue-600 to-cyan-500", pin: "", products: [], theme: initialBusinesses[0].theme };
-    await createSupabaseBusiness(business);
-    if (authRequired) await refreshAuthorizedBusinesses();
-    else setBusinesses((current) => [...current, business]);
-    showToast("Empresa guardada en Supabase");
-  }, [businesses, showToast, authRequired, refreshAuthorizedBusinesses]);
+    if (!authRequired) {
+      setBusinesses((current) => [...current, business]);
+      showToast("Empresa agregada en modo demo; activa el acceso seguro para guardarla en Supabase.");
+      return;
+    }
+    if (!(await initSupabase())) throw new Error("Configura Supabase para guardar empresas de forma persistente.");
+    try {
+      await createSupabaseBusiness(business);
+    } catch (error) {
+      if (String(error.message).includes("not_authorized_to_create_company")) {
+        throw new Error("Solo un administrador con permiso para gestionar usuarios puede crear empresas.");
+      }
+      throw error;
+    }
+    const refreshedBusinesses = await refreshAuthorizedBusinesses();
+    const createdBusiness = refreshedBusinesses.find((item) => item.id === slug);
+    if (!createdBusiness) throw new Error("La empresa se guardó, pero no apareció en tu lista. Comprueba tu membresía en Supabase.");
+    const client = await fetchSupabaseClient(createdBusiness.id);
+    if (!client) throw new Error("La empresa se guardó, pero no se pudo abrir su configuración.");
+    setSelectedBusiness(createdBusiness);
+    setPinBusiness(null);
+    resetSessionFilters();
+    navigateToPath(businessPath(createdBusiness), true);
+    setAccessCompany({ id: client.id, name: createdBusiness.name });
+    showToast("Empresa creada. Genera su código de acceso y configura a sus usuarios.");
+  }, [businesses, showToast, authRequired, refreshAuthorizedBusinesses, resetSessionFilters]);
 
   const handleExport = useCallback(async () => {
     if (!selectedBusiness) return;

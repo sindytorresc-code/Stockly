@@ -7,14 +7,17 @@ import { Plus, X } from "lucide-react";
 export default function ClientSelector({ onSelect, businesses: availableBusinesses = businesses, onCreate, onSignOut }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   async function submit(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") || "").trim();
     const type = String(form.get("type") || "").trim();
     if (!name || !type) return setError("Completa el nombre y el tipo de empresa.");
+    setSaving(true);
     try { await onCreate({ name, type, description: String(form.get("description") || "").trim() }); setCreating(false); setError(""); }
     catch (e) { setError(e.message || "No se pudo guardar la empresa."); }
+    finally { setSaving(false); }
   }
   return (
     <main className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10 text-slate-950">
@@ -50,17 +53,17 @@ export default function ClientSelector({ onSelect, businesses: availableBusiness
               </button>
             );
           })}
-          <button type="button" onClick={() => setCreating(true)} className="grid min-h-48 place-items-center rounded-lg border-2 border-dashed border-slate-300 bg-white/70 p-6 text-slate-600 transition hover:border-blue-500 hover:text-blue-700">
-            <span className="flex items-center gap-2 font-bold"><Plus size={20} /> Crear empresa</span>
+          <button type="button" onClick={() => { setError(""); setCreating(true); }} className="grid min-h-48 place-items-center rounded-lg border-2 border-dashed border-slate-300 bg-white/70 p-6 text-slate-600 transition hover:border-blue-500 hover:text-blue-700">
+            <span className="flex items-center gap-2 font-bold"><Plus size={20} /> Agregar empresa</span>
           </button>
         </div>
       </section>
-      {creating && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={submit} className="w-full max-w-md rounded-xl bg-white p-6 text-slate-950 shadow-2xl">
-        <div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-extrabold">Nueva empresa</h2><button type="button" onClick={() => setCreating(false)} aria-label="Cerrar"><X /></button></div>
+      {creating && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4"><form onSubmit={submit} aria-label="Agregar empresa" className="w-full max-w-md rounded-xl bg-white p-6 text-slate-950 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between"><div><h2 className="text-xl font-extrabold">Agregar empresa</h2><p className="mt-1 text-sm text-slate-500">Se guardará en Supabase y tendrá su propio inventario.</p></div><button type="button" disabled={saving} onClick={() => setCreating(false)} aria-label="Cerrar"><X /></button></div>
         <label className="mb-3 block text-sm font-bold">Nombre<input name="name" required maxLength="80" className="mt-1 h-11 w-full rounded-lg border px-3" /></label>
         <label className="mb-3 block text-sm font-bold">Tipo de negocio<input name="type" required maxLength="60" className="mt-1 h-11 w-full rounded-lg border px-3" /></label>
         <label className="mb-4 block text-sm font-bold">Descripción<input name="description" maxLength="200" className="mt-1 h-11 w-full rounded-lg border px-3" /></label>
-        {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}<button className="h-11 w-full rounded-lg bg-blue-700 font-bold text-white">Guardar empresa</button>
+        {error && <p role="alert" className="mb-3 break-words text-sm text-red-700">{error}</p>}<button disabled={saving} className="h-11 w-full rounded-lg bg-blue-700 font-bold text-white disabled:opacity-60">{saving ? "Guardando…" : "Guardar y configurar acceso"}</button>
       </form></div>}
     </main>
   );

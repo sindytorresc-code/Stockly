@@ -27,14 +27,22 @@ select r.id, p.id from public.roles r join public.permissions p
 where r.name='employee'
 on conflict do nothing;
 
--- Creating a new company grants its creator admin privileges. Restrict this
--- privileged bootstrap to the server-managed app_metadata flag; user_metadata
--- and client-supplied RPC arguments are user-controlled and must never qualify.
+-- Creating a new company grants its creator admin privileges. Only an existing
+-- company administrator (users.manage) or a server-authorized platform admin
+-- may do this; user_metadata and client-supplied role arguments never qualify.
 create or replace function private.create_company(company_slug text, company_name text, company_type text, company_description text)
 returns public.clients language plpgsql security definer set search_path=pg_catalog, public as $$
 declare created public.clients; admin_role uuid;
 begin
-  if auth.uid() is null or coalesce(auth.jwt()->'app_metadata'->>'stockly_platform_admin','false') <> 'true' then
+  if auth.uid() is null then
+    raise exception 'authentication_required';
+  end if;
+  if coalesce(auth.jwt()->'app_metadata'->>'stockly_platform_admin','false') <> 'true'
+    and not exists (
+      select 1 from public.client_memberships m
+      where m.user_id=auth.uid() and m.active
+        and private.has_client_permission(m.client_id,'users.manage')
+    ) then
     raise exception 'not_authorized_to_create_company';
   end if;
   insert into public.clients(slug,name,business_type,description)
