@@ -13,6 +13,8 @@ const ACCESS_TOKEN_KEY = "stockly-access-token";
 const REFRESH_TOKEN_KEY = "stockly-refresh-token";
 const PKCE_VERIFIER_KEY = "stockly-oauth-verifier";
 const COMPANY_CODE_KEY = "stockly-pending-company-code";
+const OAUTH_FLOW_KEY = "stockly-oauth-flow";
+const COMPANY_DRAFT_KEY = "stockly-pending-company-draft";
 let accessToken = typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(ACCESS_TOKEN_KEY);
 let refreshToken = typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(REFRESH_TOKEN_KEY);
 let tokenExpiresAt = Number(typeof sessionStorage === "undefined" ? 0 : sessionStorage.getItem("stockly-token-expiry")) || 0;
@@ -74,23 +76,58 @@ export async function joinCompanyWithCode(companyCode) {
 }
 export async function signInWithGoogle(companyCode) {
   const normalizedCode = normalizeCompanyAccessCode(companyCode);
+  return beginGoogleOAuth({ mode: "join", companyCode: normalizedCode });
+}
+
+export async function registerCompanyWithGoogle(draft) {
+  const cleanDraft = {
+    name: String(draft?.name || "").trim(),
+    type: String(draft?.type || "").trim(),
+    description: String(draft?.description || "").trim(),
+  };
+  if (!cleanDraft.name || !cleanDraft.type || cleanDraft.name.length > 80 || cleanDraft.type.length > 60 || cleanDraft.description.length > 200) {
+    throw new Error("Revisa los datos de la empresa antes de continuar.");
+  }
+  sessionStorage.setItem(COMPANY_DRAFT_KEY, JSON.stringify(cleanDraft));
+  return beginGoogleOAuth({ mode: "create-company" });
+}
+
+async function beginGoogleOAuth({ mode, companyCode }) {
   const config = await requireSupabaseConfig();
   const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
   const verifier = toBase64Url(verifierBytes);
   const challenge = toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   const redirectTo = `${window.location.origin}${window.location.pathname}`;
   sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
-  sessionStorage.setItem(COMPANY_CODE_KEY, normalizedCode);
+  sessionStorage.setItem(OAUTH_FLOW_KEY, mode);
+  if (companyCode) sessionStorage.setItem(COMPANY_CODE_KEY, companyCode);
+  else sessionStorage.removeItem(COMPANY_CODE_KEY);
   window.location.assign(buildGoogleAuthorizeUrl({ supabaseUrl: config.url, redirectTo, codeChallenge: challenge }));
+}
+
+export function consumePendingCompanyDraft() {
+  const serialized = sessionStorage.getItem(COMPANY_DRAFT_KEY);
+  sessionStorage.removeItem(COMPANY_DRAFT_KEY);
+  if (!serialized) return null;
+  try {
+    const draft = JSON.parse(serialized);
+    if (typeof draft?.name !== "string" || typeof draft?.type !== "string") return null;
+    return draft;
+  } catch {
+    return null;
+  }
 }
 
 export async function completeGoogleSignIn() {
   const url = new URL(window.location.href);
   const oauthError = url.searchParams.get("error_description") || url.searchParams.get("error");
   const authCode = url.searchParams.get("code");
+  const oauthFlow = sessionStorage.getItem(OAUTH_FLOW_KEY) || "join";
   if (oauthError) {
     sessionStorage.removeItem(PKCE_VERIFIER_KEY);
     sessionStorage.removeItem(COMPANY_CODE_KEY);
+    sessionStorage.removeItem(OAUTH_FLOW_KEY);
+    sessionStorage.removeItem(COMPANY_DRAFT_KEY);
     window.history.replaceState({}, document.title, url.pathname);
     throw new Error(oauthError);
   }
@@ -99,8 +136,9 @@ export async function completeGoogleSignIn() {
   const companyCode = sessionStorage.getItem(COMPANY_CODE_KEY);
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
   sessionStorage.removeItem(COMPANY_CODE_KEY);
+  sessionStorage.removeItem(OAUTH_FLOW_KEY);
   window.history.replaceState({}, document.title, `${url.pathname}${url.hash}`);
-  if (!verifier || !companyCode) throw new Error("Se perdió el código de empresa durante el inicio de sesión. Vuelve a intentarlo.");
+  if (!verifier || (oauthFlow !== "create-company" && !companyCode)) throw new Error("Se perdió la información del inicio de sesión. Vuelve a intentarlo.");
   const config = await requireSupabaseConfig();
   const response = await fetch(`${config.url}/auth/v1/token?grant_type=pkce`, {
     method: "POST", headers: { apikey: config.key, "Content-Type": "application/json" },
@@ -109,11 +147,18 @@ export async function completeGoogleSignIn() {
   const session = await response.json();
   if (!response.ok || !session.access_token) throw new Error(session.msg || session.message || "No se pudo completar el acceso con Google.");
   saveSession(session);
-  try {
-    await joinCompanyWithCode(companyCode);
-  } catch (error) {
-    await signOut();
-    throw new Error(error.message?.includes("invalid_company_access_code") ? "El código de empresa no es válido o está desactivado." : error.message || "No se pudo vincular tu cuenta a la empresa.");
+  if (oauthFlow === "create-company") {
+    if (!sessionStorage.getItem(COMPANY_DRAFT_KEY)) {
+      await signOut();
+      throw new Error("Se perdieron los datos de la empresa. Vuelve a iniciar el registro.");
+    }
+  } else {
+    try {
+      await joinCompanyWithCode(companyCode);
+    } catch (error) {
+      await signOut();
+      throw new Error(error.message?.includes("invalid_company_access_code") ? "El código de empresa no es válido o está desactivado." : error.message || "No se pudo vincular tu cuenta a la empresa.");
+    }
   }
   return true;
 }

@@ -28,7 +28,7 @@ import {
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, restoreAuthSession, signOut } from "./lib/supabase.js";
+import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
@@ -164,6 +164,16 @@ export default function App() {
     setAccessCompany({ id: client.id, name: createdBusiness.name });
     showToast("Empresa creada. Genera su código de acceso y configura a sus usuarios.");
   }, [businesses, showToast, authRequired, refreshAuthorizedBusinesses, resetSessionFilters]);
+
+  useEffect(() => {
+    if (!authRequired || !authReady || !authenticated) return;
+    const pendingDraft = consumePendingCompanyDraft();
+    if (!pendingDraft) return;
+    handleCreateBusiness(pendingDraft).catch((error) => {
+      console.error(error);
+      showToast(error.message || "No se pudo registrar la empresa.");
+    });
+  }, [authRequired, authReady, authenticated, handleCreateBusiness, showToast]);
 
   const handleExport = useCallback(async () => {
     if (!selectedBusiness) return;
@@ -500,7 +510,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.appBg} ${theme.text}`}>
-      {authRequired && !authReady ? <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Restaurando sesión…</main> : authRequired && !authenticated ? <SignIn initialError={authError} onSignedIn={() => { setAuthError(""); setAuthenticated(true); }} /> : !selectedBusiness ? (
+      {authRequired && !authReady ? <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Restaurando sesión…</main> : authRequired && !authenticated ? <SignIn initialError={authError} onRegisterCompany={registerCompanyWithGoogle} onSignedIn={() => { setAuthError(""); setAuthenticated(true); }} /> : !selectedBusiness ? (
         <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} />
       ) : (
         <InventoryDashboard

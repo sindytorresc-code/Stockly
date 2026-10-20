@@ -27,9 +27,8 @@ select r.id, p.id from public.roles r join public.permissions p
 where r.name='employee'
 on conflict do nothing;
 
--- Creating a new company grants its creator admin privileges. Only an existing
--- company administrator (users.manage) or a server-authorized platform admin
--- may do this; user_metadata and client-supplied role arguments never qualify.
+-- Creating a new company grants its creator admin privileges only inside that
+-- newly created tenant. Existing company memberships and roles are untouched.
 create or replace function private.create_company(company_slug text, company_name text, company_type text, company_description text)
 returns public.clients language plpgsql security definer set search_path=pg_catalog, public as $$
 declare created public.clients; admin_role uuid;
@@ -37,16 +36,14 @@ begin
   if auth.uid() is null then
     raise exception 'authentication_required';
   end if;
-  if coalesce(auth.jwt()->'app_metadata'->>'stockly_platform_admin','false') <> 'true'
-    and not exists (
-      select 1 from public.client_memberships m
-      where m.user_id=auth.uid() and m.active
-        and private.has_client_permission(m.client_id,'users.manage')
-    ) then
-    raise exception 'not_authorized_to_create_company';
+  if length(trim(coalesce(company_slug, ''))) not between 1 and 80
+    or length(trim(coalesce(company_name, ''))) not between 1 and 80
+    or length(trim(coalesce(company_type, ''))) not between 1 and 60
+    or length(coalesce(company_description, '')) > 200 then
+    raise exception 'invalid_company_details';
   end if;
   insert into public.clients(slug,name,business_type,description)
-    values(company_slug,company_name,company_type,coalesce(company_description,'')) returning * into created;
+    values(trim(company_slug),trim(company_name),trim(company_type),coalesce(trim(company_description),'')) returning * into created;
   select id into admin_role from public.roles where name='admin' and system_role;
   if admin_role is null then raise exception 'admin_role_not_configured'; end if;
   insert into public.client_memberships(client_id,user_id,role_id) values(created.id,auth.uid(),admin_role);
