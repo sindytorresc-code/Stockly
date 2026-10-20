@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Usuario - Sistema de Inventario Stockly</title>
+<style>
+  :root{
+    --azul:#1f6feb; --tinta:#111827; --gris:#6b7280; --gris2:#9ca3af;
+    --linea:#e5e7eb; --suave:#f3f4f6; --acento:#7c3aed;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#525659;color:var(--tinta);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .page{
+    width:210mm;min-height:297mm;background:#fff;margin:16px auto;padding:24mm 20mm;
+    position:relative;box-shadow:0 2px 12px rgba(0,0,0,.35);
+  }
+  h1,h2,h3{margin:0;}
+  p{line-height:1.6;color:#374151;}
+  code{background:var(--suave);padding:1px 6px;border-radius:4px;font-family:Consolas,monospace;font-size:.92em;color:#111827;}
+
+  /* ---------- PORTADA ---------- */
+  .cover{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;}
+  .cover .brand{width:96px;height:96px;border-radius:22px;
+    background:var(--azul);display:flex;align-items:center;justify-content:center;margin-bottom:28px;}
+  .cover .brand svg{width:52px;height:52px;stroke:#fff;fill:none;stroke-width:2;}
+  .cover .kicker{letter-spacing:3px;text-transform:uppercase;color:var(--gris);font-size:14px;font-weight:600;margin-bottom:12px;}
+  .cover h1{font-size:44px;line-height:1.15;margin-bottom:10px;}
+  .cover .app{font-size:22px;color:var(--azul);font-weight:700;margin-bottom:40px;}
+  .cover .rule{width:70px;height:4px;background:var(--acento);border-radius:4px;margin:0 auto 40px;}
+  .cover .meta{border-top:1px solid var(--linea);padding-top:22px;width:70%;color:var(--gris);font-size:15px;}
+  .cover .meta b{color:var(--tinta);}
+
+  /* ---------- ENCABEZADOS DE SECCION ---------- */
+  .head{display:flex;align-items:center;gap:14px;border-bottom:3px solid var(--azul);padding-bottom:14px;margin-bottom:26px;}
+  .num{flex:0 0 auto;width:44px;height:44px;border-radius:10px;background:var(--azul);color:#fff;
+    font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .head h2{font-size:26px;}
+  .head .sub{color:var(--gris);font-size:14px;margin-top:2px;}
+
+  /* ---------- INDICE ---------- */
+  .toc-item{display:flex;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--linea);}
+  .toc-item .t{font-size:18px;font-weight:600;color:var(--tinta);}
+  .toc-item .d{flex:1;border-bottom:2px dotted var(--gris2);margin:0 10px;transform:translateY(-4px);}
+  .toc-item .pg{font-size:16px;color:var(--azul);font-weight:700;}
+  .toc-item .desc{display:block;color:var(--gris);font-size:13px;font-weight:400;margin-top:3px;}
+
+  /* ---------- PASOS ---------- */
+  .step{display:flex;gap:14px;margin:16px 0;}
+  .step .b{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:var(--suave);
+    color:var(--azul);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid var(--linea);}
+  .step .c{flex:1;}
+  .step .c b{color:#111827;}
+
+  figure{margin:22px 0;}
+  figure img{width:100%;border:1px solid var(--linea);border-radius:10px;display:block;}
+  figcaption{color:var(--gris);font-size:12.5px;text-align:center;margin-top:8px;font-style:italic;}
+
+  .nota{background:#eff6ff;border-left:4px solid var(--azul);padding:12px 16px;border-radius:6px;margin:18px 0;font-size:14px;color:#1e3a8a;}
+  .tip{background:#f5f3ff;border-left:4px solid var(--acento);padding:12px 16px;border-radius:6px;margin:18px 0;font-size:14px;color:#4c1d95;}
+
+  .foot{position:absolute;bottom:14mm;left:20mm;right:20mm;display:flex;justify-content:space-between;
+    color:var(--gris2);font-size:11px;border-top:1px solid var(--linea);padding-top:8px;}
+
+  @media print{
+    html,body{background:#fff;}
+    .page{margin:0;box-shadow:none;width:auto;min-height:auto;page-break-after:always;}
+    .page:last-child{page-break-after:auto;}
+    .noprint{display:none;}
+  }
+  .bar{position:fixed;top:0;left:0;right:0;background:#1f2937;color:#fff;padding:10px 16px;
+    text-align:center;font-size:13px;z-index:10;}
+  .bar b{color:#fbbf24;}
+</style>
+</head>
+<body>
+
+<div class="bar noprint">Para guardar como PDF: presiona <b>Ctrl + P</b> &rarr; Destino <b>Guardar como PDF</b> &rarr; Márgenes: Predeterminado.</div>
+
+<!-- ============ PORTADA ============ -->
+<section class="page cover">
+  <div class="brand">
+    <svg viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4 8 4 8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/></svg>
+  </div>
+  <div class="kicker">Manual de Usuario</div>
+  <h1>Sistema de Inventario</h1>
+  <div class="app">Stockly</div>
+  <div class="rule"></div>
+  <p style="max-width:70%;color:#6b7280;">
+    Guía práctica para el manejo del sistema web de inventario multi-negocio:
+    inicio de sesión, registro de productos y consulta de información.
+  </p>
+  <div class="meta">
+    <p><b>Elaborado por:</b> Sindy Torres</p>
+    <p><b>Aplicación:</b> https://sindytorresc-code.github.io/Stockly/</p>
+    <p><b>Versión:</b> 1.0 &nbsp;·&nbsp; <b>Evidencia 6</b></p>
+  </div>
+</section>
+
+<!-- ============ INDICE ============ -->
+<section class="page">
+  <div class="head">
+    <div class="num" style="background:var(--acento)">i</div>
+    <div><h2>Índice</h2><div class="sub">Contenido del manual</div></div>
+  </div>
+
+  <div class="toc-item">
+    <span class="t">1. Introducción
+      <span class="desc">Qué es el sistema y para qué sirve</span></span>
+    <span class="d"></span><span class="pg">3</span>
+  </div>
+  <div class="toc-item">
+    <span class="t">2. Cómo iniciar sesión
+      <span class="desc">Seleccionar el negocio e ingresar el código de acceso (PIN)</span></span>
+    <span class="d"></span><span class="pg">4</span>
+  </div>
+  <div class="toc-item">
+    <span class="t">3. Cómo registrar un producto
+      <span class="desc">Agregar un nuevo activo al inventario</span></span>
+    <span class="d"></span><span class="pg">5</span>
+  </div>
+  <div class="toc-item">
+    <span class="t">4. Cómo consultar información
+      <span class="desc">Ver, buscar y filtrar los productos registrados</span></span>
+    <span class="d"></span><span class="pg">6</span>
+  </div>
+
+  <div class="foot"><span>Manual de Usuario · Stockly</span><span>Índice</span></div>
+</section>
+
+<!-- ============ INTRODUCCION ============ -->
+<section class="page">
+  <div class="head">
+    <div class="num">1</div>
+    <div><h2>Introducción</h2><div class="sub">Conociendo el sistema</div></div>
+  </div>
+
+  <p><b>Stockly</b> es un sistema web para el control de inventario de varios negocios desde
+  un mismo lugar. Cada negocio (ATAIN, Sabor Fresco, Estilo Vogue y Mara Makeup) maneja
+  su propio catálogo de productos o activos de forma independiente y protegida por un
+  código de acceso.</p>
+
+  <h3 style="margin:22px 0 10px;color:#111827;">¿Qué permite hacer?</h3>
+  <div class="step"><div class="b">✓</div><div class="c"><b>Iniciar sesión por negocio</b> mediante un código de 4 dígitos (PIN).</div></div>
+  <div class="step"><div class="b">✓</div><div class="c"><b>Registrar productos</b> con nombre, categoría, código, precio y existencias.</div></div>
+  <div class="step"><div class="b">✓</div><div class="c"><b>Consultar el inventario</b> con buscador, filtros y estadísticas en tiempo real.</div></div>
+  <div class="step"><div class="b">✓</div><div class="c"><b>Editar o eliminar</b> productos y ver alertas de stock bajo o agotado.</div></div>
+
+  <div class="nota"><b>Requisitos:</b> solo necesitas un navegador web (Chrome, Edge o Firefox)
+  y conexión a internet. No se instala nada en el computador.</div>
+
+  <div class="tip"><b>Recomendación:</b> mantén tu código de acceso en un lugar seguro y no
+  lo compartas con personas ajenas al negocio.</div>
+
+  <div class="foot"><span>Manual de Usuario · Stockly</span><span>Página 3</span></div>
+</section>
+
+<!-- ============ INICIAR SESION ============ -->
+<section class="page">
+  <div class="head">
+    <div class="num">2</div>
+    <div><h2>Cómo iniciar sesión</h2><div class="sub">Acceso al sistema</div></div>
+  </div>
+
+  <div class="step"><div class="b">1</div><div class="c">Abre la aplicación en tu navegador. Verás la pantalla <b>“Selecciona tu negocio para continuar”</b> con las tarjetas de cada negocio.</div></div>
+  <div class="step"><div class="b">2</div><div class="c">Haz clic en la tarjeta del negocio al que deseas ingresar (por ejemplo, <b>Mara Makeup</b>) o en el botón <b>Entrar →</b>.</div></div>
+
+  <figure>
+    <img src="img/01-negocios.png" alt="Pantalla de selección de negocio">
+    <figcaption>Figura 2.1 — Pantalla inicial: selección del negocio.</figcaption>
+  </figure>
+
+  <div class="step"><div class="b">3</div><div class="c">Se abrirá la ventana <b>“Ingresa tu código de acceso”</b>. Digita tu <b>PIN de 4 dígitos</b> en el teclado numérico.</div></div>
+  <div class="step"><div class="b">4</div><div class="c">Al escribir el cuarto dígito, el sistema valida la clave y te lleva automáticamente al inventario del negocio.</div></div>
+
+  <figure>
+    <img src="img/02-login.png" alt="Ventana de ingreso de código PIN">
+    <figcaption>Figura 2.2 — Ingreso del código de acceso (PIN).</figcaption>
+  </figure>
+
+  <div class="nota"><b>¿Clave incorrecta?</b> El sistema te avisará y podrás volver a intentarlo.
+  Usa el botón de borrar (⌫) para corregir un dígito.</div>
+
+  <div class="foot"><span>Manual de Usuario · Stockly</span><span>Página 4</span></div>
+</section>
+
+<!-- ============ REGISTRAR PRODUCTO ============ -->
+<section class="page">
+  <div class="head">
+    <div class="num">3</div>
+    <div><h2>Cómo registrar un producto</h2><div class="sub">Agregar un nuevo activo al inventario</div></div>
+  </div>
+
+  <div class="step"><div class="b">1</div><div class="c">Dentro del inventario, haz clic en el botón <b>“+ Agregar activo”</b> ubicado en la parte superior derecha.</div></div>
+  <div class="step"><div class="b">2</div><div class="c">Se abrirá el formulario <b>“Agregar activo”</b>. Completa los campos obligatorios (marcados con <b>*</b>):
+    <b>Nombre</b>, <b>Categoría</b>, <b>Serial / Código</b>, <b>Precio</b> y <b>Stock</b>.</div></div>
+  <div class="step"><div class="b">3</div><div class="c">Opcionalmente agrega <b>Stock mínimo</b>, <b>Precio de compra</b>, <b>Marca</b>, <b>URL de imagen</b>, <b>Estado</b> y una <b>Descripción</b>.</div></div>
+
+  <figure>
+    <img src="img/03-registrar.png" alt="Formulario para registrar un producto">
+    <figcaption>Figura 3.1 — Formulario de registro con datos de ejemplo.</figcaption>
+  </figure>
+
+  <div class="step"><div class="b">4</div><div class="c">Verifica la información y presiona <b>“Guardar activo”</b>. El producto aparecerá de inmediato en la lista del inventario.</div></div>
+
+  <div class="nota"><b>Regla automática:</b> si el <b>stock es 0</b>, el estado del producto cambia
+  automáticamente a <b>“Agotado”</b> (excepto cuando está en “Reparación”).</div>
+
+  <div class="tip"><b>Importación masiva:</b> también puedes cargar muchos productos a la vez
+  con el botón <b>“Cargar archivo”</b> usando un archivo CSV.</div>
+
+  <div class="foot"><span>Manual de Usuario · Stockly</span><span>Página 5</span></div>
+</section>
+
+<!-- ============ CONSULTAR INFORMACION ============ -->
+<section class="page">
+  <div class="head">
+    <div class="num">4</div>
+    <div><h2>Cómo consultar información</h2><div class="sub">Ver, buscar y filtrar productos</div></div>
+  </div>
+
+  <p>Al iniciar sesión verás el <b>panel de inventario</b> del negocio con todos sus productos
+  y un resumen general en la parte superior.</p>
+
+  <div class="step"><div class="b">1</div><div class="c"><b>Tarjetas de resumen:</b> muestran el total de <b>Productos</b>, el <b>Valor total</b> del inventario, y las alertas de <b>Stock bajo</b> y <b>Agotados</b>.</div></div>
+  <div class="step"><div class="b">2</div><div class="c"><b>Buscador:</b> escribe un nombre, categoría, código, campaña o comentario para encontrar un producto al instante.</div></div>
+  <div class="step"><div class="b">3</div><div class="c"><b>Filtros rápidos:</b> usa los botones <b>Todos</b>, <b>En stock</b>, <b>Stock bajo</b> y <b>Agotados</b> para depurar la lista.</div></div>
+  <div class="step"><div class="b">4</div><div class="c"><b>Acciones:</b> con los íconos de cada fila puedes <b>editar</b> (✏️) o <b>eliminar</b> (🗑️) un producto.</div></div>
+
+  <figure>
+    <img src="img/04-consultar.png" alt="Panel de consulta del inventario">
+    <figcaption>Figura 4.1 — Panel de inventario: resumen, buscador, filtros y listado de productos.</figcaption>
+  </figure>
+
+  <div class="nota"><b>Estados de color:</b> cada producto muestra su estado (<b>En stock</b>,
+  <b>Stock bajo</b>, <b>Campaña</b>, <b>Agotado</b>) con una etiqueta de color para identificarlo rápidamente.</div>
+
+  <div class="foot"><span>Manual de Usuario · Stockly</span><span>Página 6</span></div>
+</section>
+
+</body>
+</html>

@@ -1,5 +1,4 @@
-﻿-- Esquema recomendado para Supabase o PostgreSQL.
--- Ejecuta este archivo en el SQL Editor de Supabase.
+﻿-- Ejecuta este archivo en el SQL Editor de Supabase.
 
 create table if not exists clients (
   id uuid primary key default gen_random_uuid(),

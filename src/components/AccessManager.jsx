@@ -15,11 +15,29 @@ export default function AccessManager({ clientId, businessName, onClose }) {
     finally { setBusy(false); }
   }
   useEffect(() => { refresh(); }, [clientId]);
-  async function submit(event) {
-    event.preventDefault(); const data = new FormData(event.currentTarget);
-    try { await saveClientMembership(clientId, String(data.get("userId")).trim(), String(data.get("roleId"))); event.currentTarget.reset(); await refresh(); }
-    catch (e) { setError(e.message || "No se pudo guardar el acceso."); }
+  
+async function submit(event) {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const data = new FormData(form);
+
+  setError("");
+
+  try {
+    await saveClientMembership(
+      clientId,
+      String(data.get("userId")).trim(),
+      String(data.get("roleId"))
+    );
+
+    form.reset();
+    await refresh();
+  } catch (e) {
+    setError(e.message || "No se pudo guardar el acceso.");
   }
+}
+
   async function rotateCode() {
     setError(""); setNewCode("");
     try { setNewCode(await rotateCompanyAccessCode(clientId)); }

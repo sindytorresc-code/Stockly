@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Tablas de la base de datos - Stockly</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 40px;
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    width: 1100px;
+  }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: #8b949e; font-size: 14px; margin-bottom: 28px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .full { grid-column: 1 / -1; }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px;
+    background: #1c2330;
+    border-bottom: 1px solid #30363d;
+  }
+  .card-head .name { font-family: "SF Mono", Consolas, monospace; font-size: 15px; font-weight: 600; color: #58a6ff; }
+  .card-head .count { font-size: 12px; color: #8b949e; background:#0d1117; border:1px solid #30363d; border-radius:20px; padding:2px 10px;}
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 16px; border-bottom: 1px solid #21262d; }
+  th { color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+  td.col { font-family: "SF Mono", Consolas, monospace; color: #e6edf3; }
+  td.type { color: #79c0ff; font-family: "SF Mono", Consolas, monospace; font-size: 12px; }
+  .key { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+  .pk { background: #1f6feb33; color: #58a6ff; border:1px solid #1f6feb66; }
+  .fk { background: #db6d2833; color: #ffa657; border:1px solid #db6d2866; }
+  .uk { background: #23863633; color: #3fb950; border:1px solid #23863666; }
+  td.desc { color: #8b949e; }
+  .rel {
+    grid-column: 1 / -1;
+    display:flex; align-items:center; justify-content:center; gap:16px;
+    color:#8b949e; font-size:14px; margin: 4px 0 8px;
+  }
+  .rel b { color:#58a6ff; }
+  .rel .line { height:2px; width:90px; background:#1f6feb; }
+  footer { margin-top: 26px; color:#6e7681; font-size:12px; }
+  .tag { color:#3fb950; }
+</style>
+</head>
+<body>
+  <h1>Base de datos Stockly — Tablas creadas</h1>
+  <div class="sub">PostgreSQL / Supabase · proyecto <code>ashgqegyqnfwjytdsrzn.supabase.co</code></div>
+
+  <div class="grid">
+    <!-- CLIENTS -->
+    <div class="card">
+      <div class="card-head"><span class="name">clients</span><span class="count">4 registros · 9 columnas</span></div>
+      <table>
+        <thead><tr><th>Columna</th><th>Tipo</th><th>Llave</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td class="col">id</td><td class="type">uuid</td><td><span class="key pk">PK</span></td><td class="desc">Identificador único</td></tr>
+          <tr><td class="col">slug</td><td class="type">text</td><td><span class="key uk">UK</span></td><td class="desc">atain | sabor | vogue | mara</td></tr>
+          <tr><td class="col">name</td><td class="type">text</td><td></td><td class="desc">Nombre comercial</td></tr>
+          <tr><td class="col">business_type</td><td class="type">text</td><td></td><td class="desc">Rubro del negocio</td></tr>
+          <tr><td class="col">description</td><td class="type">text</td><td></td><td class="desc">Descripción</td></tr>
+          <tr><td class="col">icon</td><td class="type">text</td><td></td><td class="desc">Icono en la UI</td></tr>
+          <tr><td class="col">pin_hash</td><td class="type">text</td><td></td><td class="desc">Clave de acceso (4 dígitos)</td></tr>
+          <tr><td class="col">theme</td><td class="type">jsonb</td><td></td><td class="desc">Colores y modo visual</td></tr>
+          <tr><td class="col">created_at</td><td class="type">timestamptz</td><td></td><td class="desc">Fecha de creación</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="card">
+      <div class="card-head"><span class="name">products</span><span class="count">135 registros · 17 columnas</span></div>
+      <table>
+        <thead><tr><th>Columna</th><th>Tipo</th><th>Llave</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td class="col">id</td><td class="type">uuid</td><td><span class="key pk">PK</span></td><td class="desc">Identificador único</td></tr>
+          <tr><td class="col">client_id</td><td class="type">uuid</td><td><span class="key fk">FK</span></td><td class="desc">Negocio dueño → clients.id</td></tr>
+          <tr><td class="col">name</td><td class="type">text</td><td></td><td class="desc">Nombre del producto/activo</td></tr>
+          <tr><td class="col">code</td><td class="type">text</td><td><span class="key uk">UK*</span></td><td class="desc">Código / serial</td></tr>
+          <tr><td class="col">category</td><td class="type">text</td><td></td><td class="desc">Categoría o tipo</td></tr>
+          <tr><td class="col">price</td><td class="type">numeric</td><td></td><td class="desc">Precio de venta</td></tr>
+          <tr><td class="col">purchase_price</td><td class="type">numeric</td><td></td><td class="desc">Precio de compra</td></tr>
+          <tr><td class="col">stock</td><td class="type">integer</td><td></td><td class="desc">Cantidad en inventario</td></tr>
+          <tr><td class="col">min_stock</td><td class="type">integer</td><td></td><td class="desc">Umbral de stock bajo</td></tr>
+          <tr><td class="col">status</td><td class="type">text</td><td></td><td class="desc">En stock, Asignado, Agotado…</td></tr>
+          <tr><td class="col">brand</td><td class="type">text</td><td></td><td class="desc">Marca</td></tr>
+          <tr><td class="col">spot</td><td class="type">text</td><td></td><td class="desc">Ubicación / puesto (ATAIN)</td></tr>
+          <tr><td class="col">campaign</td><td class="type">text</td><td></td><td class="desc">Campaña (BLUELINK)</td></tr>
+          <tr><td class="col">comments</td><td class="type">text</td><td></td><td class="desc">Notas, hostname</td></tr>
+          <tr><td class="col">image_url</td><td class="type">text</td><td></td><td class="desc">URL de imagen</td></tr>
+          <tr><td class="col">created_at</td><td class="type">timestamptz</td><td></td><td class="desc">Fecha de creación</td></tr>
+          <tr><td class="col">updated_at</td><td class="type">timestamptz</td><td></td><td class="desc">Última actualización</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rel">
+      <span><b>clients</b></span>
+      <span>1</span>
+      <span class="line"></span>
+      <span>N</span>
+      <span><b>products</b></span>
+      <span>&nbsp;&nbsp;(un negocio tiene muchos productos)</span>
+    </div>
+  </div>
+
+  <footer>
+    <span class="tag">UK*</span> = clave única compuesta <code>(client_id, code)</code> · FK <code>products.client_id → clients.id</code> con <code>ON DELETE CASCADE</code>.
+  </footer>
+</body>
+</html>
