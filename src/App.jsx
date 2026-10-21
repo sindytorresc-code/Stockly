@@ -28,7 +28,7 @@ import {
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut } from "./lib/supabase.js";
+import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
@@ -164,6 +164,15 @@ export default function App() {
     setAccessCompany({ id: client.id, name: createdBusiness.name });
     showToast("Empresa creada. Genera su código de acceso y configura a sus usuarios.");
   }, [businesses, showToast, authRequired, refreshAuthorizedBusinesses, resetSessionFilters]);
+
+const handleJoinCompany = useCallback(async (companyCode) => {
+  if (!(await initSupabase())) {
+    throw new Error("No se pudo conectar con Supabase.");
+  }
+
+  await joinCompanyWithCode(companyCode);
+  await refreshAuthorizedBusinesses();
+}, [refreshAuthorizedBusinesses]);
 
   useEffect(() => {
     if (!authRequired || !authReady || !authenticated) return;
@@ -511,7 +520,7 @@ export default function App() {
   return (
     <div className={`min-h-screen ${theme.appBg} ${theme.text}`}>
       {authRequired && !authReady ? <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Restaurando sesión…</main> : authRequired && !authenticated ? <SignIn initialError={authError} onRegisterCompany={registerCompanyWithGoogle} onSignedIn={() => { setAuthError(""); setAuthenticated(true); }} /> : !selectedBusiness ? (
-        <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} />
+        <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} onJoinCompany={handleJoinCompany} />
       ) : (
         <InventoryDashboard
           business={selectedBusiness}

@@ -55,18 +55,88 @@ function clearSession() {
     [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, "stockly-token-expiry"].forEach((key) => sessionStorage.removeItem(key));
   }
 }
-export async function signInWithPassword(email, password, companyCode) {
-  companyCode = normalizeCompanyAccessCode(companyCode);
+
+export async function signInWithPassword(email, password, companyCode = "") {
   const config = await requireSupabaseConfig();
-  const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
-    method: "POST", headers: { apikey: config.key, "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
-  });
+
+  const response = await fetch(
+    `${config.url}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: {
+        apikey: config.key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    }
+  );
+
   const result = await response.json();
-  if (!response.ok || !result.access_token) throw new Error(result.msg || result.message || "Correo o contraseña incorrectos");
+
+  if (!response.ok || !result.access_token) {
+    throw new Error(
+      result.msg ||
+        result.message ||
+        "Correo o contraseña incorrectos"
+    );
+  }
+
   saveSession(result);
-  try { await joinCompanyWithCode(companyCode); }
-  catch (error) { await signOut(); throw new Error(error.message?.includes("invalid_company_access_code") ? "El código de empresa no es válido o está desactivado." : error.message); }
+
+  // Vincular a una empresa solo si se proporcionó un código.
+  // Si falla, conservar la sesión válida para no expulsar al usuario.
+  if (String(companyCode || "").trim()) {
+    try {
+      await joinCompanyWithCode(companyCode);
+    } catch (error) {
+      throw new Error(
+        error.message?.includes("invalid_company_access_code")
+          ? "Iniciaste sesión, pero el código de empresa no es válido o está desactivado. Puedes intentarlo nuevamente."
+          : `Iniciaste sesión, pero no se pudo vincular la empresa: ${error.message}`
+      );
+    }
+  }
+
   return result.user;
+}
+
+export async function signUpWithPassword(email, password) {
+  const config = await requireSupabaseConfig();
+
+  const response = await fetch(
+    `${config.url}/auth/v1/signup`,
+    {
+      method: "POST",
+      headers: {
+        apikey: config.key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: String(email).trim(),
+        password,
+      }),
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      result.msg ||
+        result.message ||
+        result.msg_description ||
+        "No fue posible crear la cuenta."
+    );
+  }
+
+  if (result.access_token) {
+    saveSession(result);
+  }
+
+  return {
+    user: result.user,
+    needsEmailConfirmation: !result.access_token,
+  };
 }
 
 export async function joinCompanyWithCode(companyCode) {
@@ -74,9 +144,15 @@ export async function joinCompanyWithCode(companyCode) {
     method: "POST", body: JSON.stringify({ access_code: normalizeCompanyAccessCode(companyCode) }),
   });
 }
-export async function signInWithGoogle(companyCode) {
-  const normalizedCode = normalizeCompanyAccessCode(companyCode);
-  return beginGoogleOAuth({ mode: "join", companyCode: normalizedCode });
+export async function signInWithGoogle(companyCode = "") {
+  const normalizedCode = String(companyCode || "").trim()
+    ? normalizeCompanyAccessCode(companyCode)
+    : "";
+
+  return beginGoogleOAuth({
+    mode: normalizedCode ? "join" : "login",
+    companyCode: normalizedCode,
+  });
 }
 
 export async function registerCompanyWithGoogle(draft) {
@@ -138,7 +214,9 @@ export async function completeGoogleSignIn() {
   sessionStorage.removeItem(COMPANY_CODE_KEY);
   sessionStorage.removeItem(OAUTH_FLOW_KEY);
   window.history.replaceState({}, document.title, `${url.pathname}${url.hash}`);
-  if (!verifier || (oauthFlow !== "create-company" && !companyCode)) throw new Error("Se perdió la información del inicio de sesión. Vuelve a intentarlo.");
+ if (!verifier) {
+  throw new Error("Se perdió la información del inicio de sesión. Vuelve a intentarlo.");
+}
   const config = await requireSupabaseConfig();
   const response = await fetch(`${config.url}/auth/v1/token?grant_type=pkce`, {
     method: "POST", headers: { apikey: config.key, "Content-Type": "application/json" },
@@ -150,16 +228,19 @@ export async function completeGoogleSignIn() {
   if (oauthFlow === "create-company") {
     if (!sessionStorage.getItem(COMPANY_DRAFT_KEY)) {
       await signOut();
-      throw new Error("Se perdieron los datos de la empresa. Vuelve a iniciar el registro.");
+      throw new Error(
+        "Se perdieron los datos de la empresa. Vuelve a iniciar el registro."
+      );
     }
-  } else {
+  } else if (oauthFlow === "join" && companyCode) {
     try {
       await joinCompanyWithCode(companyCode);
     } catch (error) {
-      await signOut();
-      throw new Error(error.message?.includes("invalid_company_access_code") ? "El código de empresa no es válido o está desactivado." : error.message || "No se pudo vincular tu cuenta a la empresa.");
+      console.error("No se pudo vincular la empresa:", error);
+      // Conservamos la sesión aunque el código no sea válido.
     }
   }
+
   return true;
 }
 
