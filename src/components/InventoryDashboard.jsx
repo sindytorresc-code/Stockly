@@ -65,7 +65,7 @@ export default function InventoryDashboard({
   onToggleHistory,
   onManageAccess,
 }) {
-  const Icon = iconMap[business.icon];
+  const Icon = iconMap[business.icon] || iconMap.package;
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
   const isAtain = business.id === "atain";
   const filterOptions = isAtain
