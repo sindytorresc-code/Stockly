@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as XLSX from "xlsx";
 import { computeAtainAssetBreakdown, countAtainBodegaAssets } from "./atainStats.js";
 import {
   computeStats,
@@ -15,6 +16,7 @@ import {
   parseAtainAssetCsv,
   parseAtainImport,
   dedupeImportProductsByCode,
+  readExcelProducts,
   parseProductForm,
   validateProduct,
 } from "./products.js";
@@ -268,6 +270,46 @@ describe("parseCsvProducts", () => {
     const products = parseCsvProducts(csv);
     expect(products).toHaveLength(1);
     expect(products[0].comments).toBe("Entrega, pendiente");
+  });
+});
+
+describe("readExcelProducts", () => {
+  function workbookBuffer(sheets, bookType = "xlsx") {
+    const workbook = XLSX.utils.book_new();
+    for (const [name, rows] of sheets) XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), name);
+    return XLSX.write(workbook, { type: "array", bookType });
+  }
+
+  it("reads Spanish inventory headers, maps columns, and skips invalid rows", () => {
+    const buffer = workbookBuffer([["Inventario", [
+      ["Nombre", "Código", "Categoría", "Precio", "Precio de compra", "Existencias", "Stock mínimo", "Estado", "Marca", "Ubicación", "Campaña", "Comentarios"],
+      ["Teclado", "TC-1", "Periféricos", 120, 80, 2, 1, "En stock", "Marca X", "Bodega", "", "Detalle"],
+      ["Fila incompleta", "", "", -1, 1],
+    ]]]);
+    expect(readExcelProducts(buffer, { businessId: "orus" }).products).toEqual([{
+      name: "Teclado", code: "TC-1", category: "Periféricos", price: 120, stock: 2, tag: "En stock", comments: "Detalle",
+      minStock: 1, purchasePrice: 80, brand: "Marca X", image: "", spot: "Bodega", campaign: "",
+    }]);
+  });
+
+  it("returns ATAIN asset workbooks to the campaign-aware CSV parser", () => {
+    const buffer = workbookBuffer([["Activos", [["spot", "modelo", "serial", "hostname"], ["39", "Optiplex", "SER-1", "HOST-1"]]]]);
+    const result = readExcelProducts(buffer, { businessId: "atain" });
+    expect(result.atainText).toContain("spot,modelo,serial,hostname");
+    expect(parseAtainImport(result.atainText, { campaign: "TRN1" }).products).toHaveLength(1);
+  });
+
+  it("reports a useful error when required headers are missing", () => {
+    const buffer = workbookBuffer([["Sheet1", [["Producto", "Valor"], ["A", 2]]]]);
+    expect(() => readExcelProducts(buffer, { businessId: "orus" })).toThrow(/Nombre y Codigo/);
+  });
+
+  it("reads legacy XLS workbooks", () => {
+    const buffer = workbookBuffer([["Inventario", [
+      ["Nombre", "Codigo", "Categoria", "Precio", "Stock"],
+      ["Mouse", "M-1", "Perifericos", 20, 4],
+    ]]], "xls");
+    expect(readExcelProducts(buffer, { businessId: "orus" }).products[0].code).toBe("M-1");
   });
 });
 

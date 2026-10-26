@@ -23,7 +23,7 @@ export default function AtainImportModal({ theme, fileName, onClose, onConfirm }
           <span>
             <span className="block text-lg font-extrabold">Importar activos ATAIN</span>
             <span className={`mt-1 block text-sm ${theme.muted}`}>
-              Selecciona la campana del archivo {fileName ? `"${fileName}"` : "CSV"}.
+              Selecciona la campana del archivo {fileName ? `"${fileName}"` : "Excel o CSV"}.
             </span>
           </span>
           <button type="button" onClick={onClose} className={`grid size-9 place-items-center rounded-lg ${theme.panelSoft}`}>
@@ -51,8 +51,7 @@ export default function AtainImportModal({ theme, fileName, onClose, onConfirm }
         </label>
 
         <p className={`mt-4 text-xs leading-relaxed ${theme.muted}`}>
-          En Excel: Archivo → Guardar como → CSV UTF-8 (delimitado por comas).
-          No subas el archivo .xlsx directamente; debe ser .csv exportado.
+          Puedes importar directamente archivos Excel o CSV con activos ATAIN.
         </p>
 
         <button type="submit" className={`mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg font-bold ${theme.accent}`}>

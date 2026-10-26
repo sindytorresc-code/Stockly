@@ -1,3 +1,5 @@
+import * as XLSX from "xlsx";
+
 export function lowStockLimit(product) {
   return Number(product.minStock ?? 3);
 }
@@ -184,10 +186,56 @@ function normalizeCsvHeader(value) {
   }
 }
 
-export function isExcelWorkbook(input) {
-  if (typeof input === "string") return false;
-  const bytes = new Uint8Array(input);
-  return bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+const productHeaderAliases = {
+  name: ["name", "nombre", "producto", "articulo", "activo"],
+  code: ["code", "codigo", "sku", "serial", "numero de serie"],
+  category: ["category", "categoria", "tipo", "modelo"],
+  price: ["price", "precio", "precio de venta", "valor"],
+  purchasePrice: ["purchase price", "precio de compra", "costo", "coste"],
+  stock: ["stock", "existencias", "cantidad", "unidades"],
+  minStock: ["min stock", "stock minimo", "existencia minima"],
+  tag: ["tag", "estado", "status"],
+  brand: ["brand", "marca"],
+  spot: ["spot", "ubicacion", "bodega", "sede"],
+  campaign: ["campaign", "campana"],
+  comments: ["comments", "comentarios", "descripcion", "observaciones"],
+  image: ["image", "imagen"],
+};
+
+export function readExcelProducts(input, options = {}) {
+  let workbook;
+  try {
+    workbook = XLSX.read(input, { type: "array", cellDates: false });
+  } catch {
+    throw new Error("No pude leer el Excel. Verifica que el archivo no este danado.");
+  }
+  const sheetName = workbook.SheetNames.find((name) => normalizeCsvHeader(name) === "inventario") || workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) throw new Error("El archivo Excel no contiene hojas con datos.");
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+  const headerIndex = rows.findIndex((row) => {
+    const headers = row.map((cell) => normalizeCsvHeader(cell));
+    return (headers.some((header) => productHeaderAliases.name.includes(header)) && headers.some((header) => productHeaderAliases.code.includes(header)))
+      || (options.businessId === "atain" && headers.includes("spot") && headers.includes("modelo") && headers.includes("serial"));
+  });
+  if (headerIndex < 0) throw new Error("No encontre columnas de Nombre y Codigo en la hoja. Revisa los encabezados del archivo.");
+  const headers = rows[headerIndex].map((cell) => normalizeCsvHeader(cell));
+  const fields = Object.entries(productHeaderAliases).map(([field, aliases]) => [field, headers.findIndex((header) => aliases.includes(header))]);
+  const hasAtainColumns = headers.includes("spot") && headers.includes("modelo") && headers.includes("serial");
+  if (options.businessId === "atain" && hasAtainColumns) {
+    return { atainText: XLSX.utils.sheet_to_csv(sheet, { FS: "," }) };
+  }
+  const indexOf = (field) => fields.find(([key]) => key === field)?.[1] ?? -1;
+  const missing = ["name", "code", "category", "price", "stock"].filter((field) => indexOf(field) < 0);
+  if (missing.length) throw new Error(`Faltan columnas obligatorias: ${missing.map((field) => ({ name: "Nombre", code: "Codigo", category: "Categoria", price: "Precio", stock: "Stock" })[field]).join(", ")}.`);
+  const csv = [
+    ["name", "code", "category", "price", "stock", "tag", "comments", "minStock", "purchasePrice", "brand", "image", "spot", "campaign"],
+    ...rows.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim())).map((row) => [
+      ...["name", "code", "category", "price", "stock"].map((field) => row[indexOf(field)] ?? ""),
+      ...["tag", "comments", "minStock", "purchasePrice", "brand", "image", "spot", "campaign"].map((field) => indexOf(field) < 0 ? "" : row[indexOf(field)]),
+    ]),
+  ].map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
+  return { products: parseCsvProducts(csv, options) };
 }
 
 function cleanCsvText(text) {
@@ -522,7 +570,7 @@ export function describeAtainImportFailure(text) {
   const firstRow = splitDelimitedRow(rows[0], delimiter);
   const preview = firstRow.slice(0, 4).join(" | ") || "sin encabezados";
 
-  return `Se leyeron ${rows.length} filas y ${firstRow.length} columnas (${preview}). Exporta el Excel como CSV UTF-8 o CSV (delimitado por punto y coma).`;
+  return `No pude reconocer productos en ${rows.length} filas y ${firstRow.length} columnas (${preview}). Revisa que la hoja tenga encabezados de activos como Spot, Modelo y Serial, y datos validos.`;
 }
 
 export function parseAtainImport(text, { campaign } = {}) {

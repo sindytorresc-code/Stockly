@@ -19,9 +19,10 @@ import {
   matchesSearch,
   decodeCsvText,
   describeAtainImportFailure,
-  isExcelWorkbook,
+  isAtainAssetCsv,
   parseAtainImport,
   parseCsvProducts,
+  readExcelProducts,
   parseProductForm,
   validateProduct,
 } from "./lib/products.js";
@@ -443,13 +444,6 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     const file = event.target.files?.[0];
     if (!file || !selectedBusiness) return;
 
-    const lowerName = file.name.toLowerCase();
-    if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
-      showToast("Exporta el Excel como CSV: Archivo → Guardar como → CSV UTF-8");
-      event.target.value = "";
-      return;
-    }
-
     const reader = new FileReader();
     reader.onerror = () => {
       showToast("No pude abrir el archivo seleccionado");
@@ -457,18 +451,22 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     };
     reader.onload = async () => {
       try {
-        if (isExcelWorkbook(reader.result)) {
-          showToast("Ese archivo es Excel (.xlsx). Exportalo primero como CSV UTF-8.");
+        const lowerName = file.name.toLowerCase();
+        const isExcel = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
+        const decoded = isExcel
+          ? readExcelProducts(reader.result, { businessId: selectedBusiness.id })
+          : null;
+        const text = isExcel ? decoded.atainText : decodeCsvText(reader.result);
+        if (isExcel && !decoded.atainText) {
+          await importParsedProducts(decoded.products, "No se encontraron productos validos. Revisa nombres, precios y existencias.");
           return;
         }
-
-        const text = decodeCsvText(reader.result);
         if (!text.trim()) {
           showToast("El archivo esta vacio");
           return;
         }
 
-        if (selectedBusiness.id === "atain") {
+        if (selectedBusiness.id === "atain" && isAtainAssetCsv(text)) {
           setAtainImportDraft({ text, fileName: file.name });
           return;
         }
@@ -477,7 +475,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
         await importParsedProducts(imported);
       } catch (error) {
         console.error(error);
-        showToast(formatSupabaseError(error, "No pude procesar el archivo CSV"));
+        showToast(formatSupabaseError(error, "No pude procesar el archivo. Verifica sus columnas y datos."));
       } finally {
         event.target.value = "";
       }
