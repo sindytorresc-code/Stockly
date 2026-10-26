@@ -17,6 +17,8 @@ import { money } from "../lib/money.js";
 import AtainAssetPieChart from "./AtainAssetPieChart.jsx";
 import ProductRow from "./ProductRow.jsx";
 import StatCard from "./StatCard.jsx";
+import CategoryInventoryChart from "./CategoryInventoryChart.jsx";
+import { computeCategoryBreakdown } from "../lib/products.js";
 
 function AtainSelectFilter({ label, value, options, theme, onChange }) {
   return (
@@ -44,6 +46,8 @@ export default function InventoryDashboard({
   query,
   filter,
   campaignFilter,
+  categoryFilter = "all",
+  categoryOverviewProducts = [],
   atainChartProducts = [],
   atainScopeProducts = [],
   products,
@@ -53,6 +57,7 @@ export default function InventoryDashboard({
   onQuery,
   onFilter,
   onCampaignFilter,
+  onCategoryFilter,
   onAdd,
   onEdit,
   onDelete,
@@ -80,6 +85,7 @@ export default function InventoryDashboard({
     campaignFilter === ATAIN_BODEGA && filter === "all"
       ? ATAIN_BODEGA
       : filterOptions.find(([value]) => value === filter)?.[1] ?? "Activos";
+  const categories = !isAtain ? computeCategoryBreakdown(categoryOverviewProducts) : [];
 
   return (
     <>
@@ -140,6 +146,13 @@ export default function InventoryDashboard({
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8">
+        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard theme={theme} icon={Package} value={stats.total} label="Total general · productos" emphasis />
+          <StatCard theme={theme} icon={DollarSign} value={money.format(stats.value)} label="Valor del inventario" />
+          <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
+          <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
+        </section>
+
         {isAtain ? (
           <div className="mb-8">
             <AtainAssetPieChart
@@ -153,12 +166,12 @@ export default function InventoryDashboard({
             />
           </div>
         ) : (
-          <section className="grid gap-4 md:grid-cols-4">
-            <StatCard theme={theme} icon={Package} value={stats.total} label="Productos" />
-            <StatCard theme={theme} icon={DollarSign} value={money.format(stats.value)} label="Valor total" />
-            <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
-            <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />
-          </section>
+          <CategoryInventoryChart
+            products={categoryOverviewProducts}
+            theme={theme}
+            categoryFilter={categoryFilter}
+            onCategoryFilter={onCategoryFilter}
+          />
         )}
 
         <section className="my-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -200,6 +213,25 @@ export default function InventoryDashboard({
                   ...atainCampaigns.map((campaign) => [campaign, campaign]),
                 ]}
               />
+            )}
+            {!isAtain && categories.length > 0 && (
+              <div className="flex flex-wrap gap-2" aria-label="Filtrar por categoría">
+                <button
+                  type="button"
+                  onClick={() => onCategoryFilter("all")}
+                  aria-pressed={categoryFilter === "all"}
+                  className={`min-h-10 rounded-lg border px-3 text-sm font-bold ${categoryFilter === "all" ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                >Todas las categorías</button>
+                {categories.map((category) => (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => onCategoryFilter(categoryFilter === category.key ? "all" : category.key)}
+                    aria-pressed={categoryFilter === category.key}
+                    className={`min-h-10 rounded-lg border px-3 text-sm font-bold ${categoryFilter === category.key ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                  >{category.label} · {category.count}</button>
+                ))}
+              </div>
             )}
           </div>
         </section>

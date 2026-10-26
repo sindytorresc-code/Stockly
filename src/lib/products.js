@@ -41,6 +41,24 @@ export function matchesFilter(product, filter) {
   return true;
 }
 
+export function matchesCategoryFilter(product, filter) {
+  if (!filter || filter === "all") return true;
+  return String(product.category || "").trim().toLocaleLowerCase() === String(filter).trim().toLocaleLowerCase();
+}
+
+export function computeCategoryBreakdown(products) {
+  const counts = new Map();
+  for (const product of products) {
+    const category = String(product.category || "").trim();
+    if (!category) continue;
+    const key = category.toLocaleLowerCase();
+    const current = counts.get(key);
+    counts.set(key, { key, label: current?.label || category, count: (current?.count || 0) + 1 });
+  }
+  return Array.from(counts.values())
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "es"));
+}
+
 export function matchesAtainAssetFilter(product, filter) {
   if (filter === "all") return true;
   const category = String(product.category || "").trim().toLowerCase();

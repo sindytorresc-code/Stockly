@@ -18,6 +18,7 @@ import {
   matchesAtainCampaignFilter,
   matchesAtainFilters,
   matchesSearch,
+  matchesCategoryFilter,
   decodeCsvText,
   describeAtainImportFailure,
   isAtainAssetCsv,
@@ -27,6 +28,7 @@ import {
   validateProduct,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
+import { genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
 import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, } from "./lib/supabase.js";
@@ -62,6 +64,7 @@ export default function App() {
   const [pinError, setPinError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
   const [editingProduct, setEditingProduct] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -88,9 +91,9 @@ export default function App() {
     return products
       .filter((product) => matchesSearch(product, query, { isAtain }))
       .filter((product) =>
-        isAtain ? matchesAtainFilters(product, filter, campaignFilter) : matchesFilter(product, filter),
+        isAtain ? matchesAtainFilters(product, filter, campaignFilter) : matchesFilter(product, filter) && matchesCategoryFilter(product, categoryFilter),
       );
-  }, [products, query, filter, campaignFilter, selectedBusiness]);
+  }, [products, query, filter, campaignFilter, categoryFilter, selectedBusiness]);
 
   const atainChartProducts = useMemo(() => {
     if (selectedBusiness?.id !== "atain") return [];
@@ -111,6 +114,7 @@ export default function App() {
 
   const resetSessionFilters = useCallback(() => {
     setFilter("all");
+    setCategoryFilter("all");
     setCampaignFilter("all");
     setQuery("");
   }, []);
@@ -119,9 +123,11 @@ export default function App() {
     const rows = await fetchSupabaseClients();
     const mapped = rows.map((row) => {
       const existing = initialBusinesses.find((item) => item.id === row.slug);
-      return existing ? { ...existing, name: row.name, type: row.business_type, description: row.description || "" } : {
+      const defaultTheme = existing?.theme || themeForBusinessType(row.business_type, initialBusinesses, genericBusinessTheme);
+      const businessTheme = resolveBusinessTheme(defaultTheme, row.theme);
+      return existing ? { ...existing, name: row.name, type: row.business_type, description: row.description || "", cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme } : {
         id: row.slug, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package",
-        cardGradient: "from-blue-600 to-cyan-500", pin: "", products: [], theme: initialBusinesses[0].theme,
+        cardGradient: businessTheme.header || genericBusinessTheme.header, pin: "", products: [], theme: businessTheme,
       };
     });
     setBusinesses(mapped);
@@ -139,7 +145,8 @@ export default function App() {
   const handleCreateBusiness = useCallback(async ({ name, type, description }) => {
     const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (!slug || businesses.some((business) => business.id === slug)) throw new Error("Ya existe una empresa con ese nombre.");
-    const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon: "package", cardGradient: "from-blue-600 to-cyan-500", pin: "", products: [], theme: initialBusinesses[0].theme };
+    const theme = themeForBusinessType(type, initialBusinesses, genericBusinessTheme);
+    const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon: "package", cardGradient: theme.header, pin: "", products: [], theme };
     if (!authRequired) {
       setBusinesses((current) => [...current, business]);
       showToast("Empresa agregada en modo demo; activa el acceso seguro para guardarla en Supabase.");
@@ -521,6 +528,8 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           query={query}
           filter={filter}
           campaignFilter={campaignFilter}
+          categoryFilter={categoryFilter}
+          categoryOverviewProducts={products}
           atainChartProducts={atainChartProducts}
           atainScopeProducts={atainScopeProducts}
           products={visibleProducts}
@@ -530,6 +539,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           onQuery={setQuery}
           onFilter={setFilter}
           onCampaignFilter={setCampaignFilter}
+          onCategoryFilter={setCategoryFilter}
           onAdd={() => openProductForm()}
           onEdit={openProductForm}
           onDelete={setProductToDelete}

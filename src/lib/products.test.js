@@ -5,6 +5,8 @@ import {
   computeStats,
   deriveTag,
   matchesFilter,
+  matchesCategoryFilter,
+  computeCategoryBreakdown,
   matchesAtainAssetFilter,
   matchesAtainCampaignFilter,
   matchesAtainFilters,
@@ -47,6 +49,28 @@ describe("matchesFilter", () => {
 
   it("detects empty inventory", () => {
     expect(matchesFilter({ stock: 0, minStock: 3 }, "empty")).toBe(true);
+  });
+});
+
+describe("category dashboard data", () => {
+  const products = [
+    { category: "Bebidas" },
+    { category: " bebidas " },
+    { category: "Despensa" },
+    { category: "" },
+  ];
+
+  it("groups categories without case or whitespace duplicates and omits empty values", () => {
+    expect(computeCategoryBreakdown(products)).toEqual([
+      { key: "bebidas", label: "Bebidas", count: 2 },
+      { key: "despensa", label: "Despensa", count: 1 },
+    ]);
+  });
+
+  it("filters by category while keeping all products for the all option", () => {
+    expect(matchesCategoryFilter(products[0], "BEBIDAS")).toBe(true);
+    expect(matchesCategoryFilter(products[2], "bebidas")).toBe(false);
+    expect(matchesCategoryFilter(products[2], "all")).toBe(true);
   });
 });
 
