@@ -32,6 +32,7 @@ select set_config('request.jwt.claim.sub',current_setting('stockly.test.company_
 select set_config('request.jwt.claims',json_build_object('sub',current_setting('stockly.test.company_admin'),'role','authenticated')::text,true);
 do $$
 declare created public.clients; one_time_code text;
+       key_status jsonb;
 begin
   created := public.create_company('stockly-security-probe-'||replace(gen_random_uuid()::text,'-',''),'Security test company','TEST','Rolled-back integration test');
   if not exists(select 1 from public.client_memberships m join public.roles r on r.id=m.role_id
@@ -39,9 +40,14 @@ begin
     raise exception 'company_creator_not_assigned_admin';
   end if;
   if not exists(select 1 from public.clients where id=created.id) then raise exception 'creator_cannot_read_created_company'; end if;
+  update public.clients set name='Security test company renamed' where id=created.id;
+  if not exists(select 1 from public.clients where id=created.id and name='Security test company renamed'
+      and slug like 'stockly-security-probe-%') then raise exception 'authorized_company_rename_changed_or_failed_identity'; end if;
   perform set_config('stockly.test.created_company',created.id::text,true);
   one_time_code := public.rotate_company_access_code(current_setting('stockly.test.admin_client')::uuid);
   if length(one_time_code)<>32 then raise exception 'admin_code_rotation_failed'; end if;
+  key_status := public.company_access_code_status(current_setting('stockly.test.admin_client')::uuid);
+  if not (key_status->>'active')::boolean or not (key_status->>'everGenerated')::boolean then raise exception 'authorized_admin_cannot_read_key_status'; end if;
   perform public.deactivate_company_access_code(current_setting('stockly.test.admin_client')::uuid);
 end $$;
 
@@ -68,9 +74,19 @@ select set_config('request.jwt.claims',json_build_object('sub',current_setting('
 do $$
 declare affected integer;
 begin
+  begin
+    perform public.company_access_code_status(current_setting('stockly.test.admin_client')::uuid);
+    raise exception 'employee_read_admin_company_key_status';
+  exception when others then
+    if sqlerrm='employee_read_admin_company_key_status' then raise; end if;
+    if sqlerrm<>'not_authorized' then raise; end if;
+  end;
   if not exists(select 1 from public.clients where id=current_setting('stockly.test.company_two')::uuid) then
     raise exception 'member_cannot_read_second_company_before_revocation';
   end if;
+  update public.clients set name='Employee must not rename' where id=current_setting('stockly.test.company_one')::uuid;
+  get diagnostics affected = row_count;
+  if affected<>0 then raise exception 'employee_renamed_company_without_company_manage'; end if;
   update public.client_memberships set active=false
     where client_id=current_setting('stockly.test.company_one')::uuid and user_id=current_setting('stockly.test.user_one')::uuid;
   get diagnostics affected = row_count;

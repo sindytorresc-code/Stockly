@@ -5,7 +5,7 @@ import { iconMap } from "../lib/icons.js";
 
 const ICON_OPTIONS = Object.keys(iconMap);
 
-export default function BrandingEditor({ value, onChange, error, onError }) {
+export default function BrandingEditor({ value, onChange, error, onError, showCompanyName = false }) {
   const brandColor = value.brandColor || "";
   const previewColor = brandColor || STANDARD_BRAND_COLORS[0].value;
   const [hexDraft, setHexDraft] = useState(brandColor);
@@ -48,6 +48,19 @@ export default function BrandingEditor({ value, onChange, error, onError }) {
 
   return (
     <div className="space-y-4">
+      {showCompanyName && (
+        <label className="block text-sm font-bold">
+          Nombre de la empresa
+          <input
+            value={value.name || ""}
+            onChange={(event) => onChange({ ...value, name: event.target.value })}
+            maxLength={80}
+            required
+            aria-label="Nombre de la empresa"
+            className="mt-1 h-11 w-full rounded-lg border px-3 font-normal"
+          />
+        </label>
+      )}
       <fieldset>
         <legend className="mb-2 text-sm font-bold">Color de marca</legend>
         <div className="flex flex-wrap gap-2">

@@ -22,4 +22,10 @@ describe("editor de identidad visual", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("HEX inválido");
   });
+
+  it("shows the editable company name only in existing-company branding settings", () => {
+    const html = renderToStaticMarkup(<BrandingEditor value={{ name: "Mara Makeup", brandColor: "#db2777", icon: "sparkles" }} onChange={() => {}} error="" onError={() => {}} showCompanyName />);
+    expect(html).toContain("Nombre de la empresa");
+    expect(html).toContain('value="Mara Makeup"');
+  });
 });

@@ -35,6 +35,7 @@ import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
+import CompanyAccessCodesManager from "./components/CompanyAccessCodesManager.jsx";
 import BrandingEditor from "./components/BrandingEditor.jsx";
 
 export default function App() {
@@ -77,6 +78,8 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyRows, setHistoryRows] = useState([]);
   const [accessCompany, setAccessCompany] = useState(null);
+  const [accessCodesOpen, setAccessCodesOpen] = useState(false);
+  const [managedAccessBusinesses, setManagedAccessBusinesses] = useState([]);
   const [brandingOpen, setBrandingOpen] = useState(false);
   const [brandingDraft, setBrandingDraft] = useState(null);
   const [brandingError, setBrandingError] = useState("");
@@ -159,6 +162,21 @@ export default function App() {
   }, [authRequired, authenticated, selectedBusiness?.clientId]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!authRequired || !authReady || !authenticated) {
+      setManagedAccessBusinesses([]);
+      return () => { cancelled = true; };
+    }
+    Promise.all(businesses.map(async (business) => ({
+      business,
+      allowed: business.clientId ? await hasClientPermission(business.clientId, "users.manage").catch(() => false) : false,
+    }))).then((results) => {
+      if (!cancelled) setManagedAccessBusinesses(results.filter((result) => result.allowed).map((result) => result.business));
+    });
+    return () => { cancelled = true; };
+  }, [authRequired, authReady, authenticated, businesses]);
+
+  useEffect(() => {
     if (!authRequired || !authenticated || !selectedBusiness) return undefined;
     let stopped = false;
     let checking = false;
@@ -231,6 +249,7 @@ export default function App() {
         return;
       }
       setBrandingDraft({
+        name: selectedBusiness.name || "",
         icon: selectedBusiness.icon || "package",
         brandColor: selectedBusiness.brandConfig?.brandColor || selectedBusiness.theme?.brandColor || "",
         logoDataUrl: selectedBusiness.brandConfig?.logoDataUrl || "",
@@ -245,13 +264,18 @@ export default function App() {
   const handleSaveBranding = useCallback(async () => {
     if (!selectedBusiness?.clientId || !brandingDraft) return;
     if (brandingError) return;
+    const companyName = String(brandingDraft.name || "").trim();
+    if (!companyName || companyName.length > 80) {
+      setBrandingError("Escribe un nombre de empresa de 1 a 80 caracteres.");
+      return;
+    }
     try {
       if (!(await hasClientPermission(selectedBusiness.clientId, "company.manage"))) {
         setCanManageBranding(false);
         throw new Error("Tu rol no tiene permiso company.manage para cambiar la identidad visual.");
       }
       const themeConfig = { ...(selectedBusiness.brandConfig || {}), ...(brandingDraft.brandColor ? { brandColor: brandingDraft.brandColor } : {}), logoDataUrl: brandingDraft.logoDataUrl || "" };
-      await updateSupabaseBusinessBranding(selectedBusiness.clientId, { icon: brandingDraft.icon, theme: themeConfig });
+      await updateSupabaseBusinessBranding(selectedBusiness.clientId, { name: companyName, icon: brandingDraft.icon, theme: themeConfig });
       const mapped = await refreshAuthorizedBusinesses();
       const updatedBusiness = mapped.find((business) => business.clientId === selectedBusiness.clientId);
       if (updatedBusiness) setSelectedBusiness(updatedBusiness);
@@ -611,7 +635,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
   return (
     <div className={`min-h-screen ${theme.appBg} ${theme.text}`} style={themeStyle}>
       {authRequired && !authReady ? <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Restaurando sesión…</main> : authRequired && !authenticated ? <SignIn initialError={authError} onRegisterCompany={registerCompanyWithGoogle} onSignedIn={() => { setAuthError(""); setAuthenticated(true); }} /> : !selectedBusiness ? (
-        <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} onJoinCompany={handleJoinCompany} />
+        <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} onJoinCompany={handleJoinCompany} onManageAccessCodes={managedAccessBusinesses.length ? () => setAccessCodesOpen(true) : undefined} />
       ) : (
         <InventoryDashboard
           business={selectedBusiness}
@@ -659,6 +683,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
       )}
 
       {accessCompany && <AccessManager clientId={accessCompany.id} businessName={accessCompany.name} onClose={() => setAccessCompany(null)} />}
+      {accessCodesOpen && <CompanyAccessCodesManager businesses={businesses} onClose={() => setAccessCodesOpen(false)} />}
 
       {brandingOpen && brandingDraft && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
@@ -667,10 +692,10 @@ const handleJoinCompany = useCallback(async (companyCode) => {
               <div><h2 id="branding-title" className="text-xl font-extrabold">Identidad visual</h2><p className="mt-1 text-sm text-slate-500">{selectedBusiness?.name}</p></div>
               <button type="button" onClick={() => setBrandingOpen(false)} aria-label="Cerrar">×</button>
             </div>
-            <BrandingEditor value={brandingDraft} onChange={setBrandingDraft} error={brandingError} onError={setBrandingError} />
+            <BrandingEditor value={brandingDraft} onChange={setBrandingDraft} error={brandingError} onError={setBrandingError} showCompanyName />
             <div className="mt-5 flex justify-end gap-3">
               <button type="button" onClick={() => setBrandingOpen(false)} className="rounded-lg border px-4 py-2 font-bold">Cancelar</button>
-              <button type="button" onClick={handleSaveBranding} className={`rounded-lg px-4 py-2 font-bold ${theme.accent}`}>Guardar cambios</button>
+              <button type="button" onClick={handleSaveBranding} disabled={Boolean(brandingError)} className={`rounded-lg px-4 py-2 font-bold disabled:opacity-50 ${theme.accent}`}>Guardar cambios</button>
             </div>
           </section>
         </div>

@@ -19,6 +19,7 @@ import ProductRow from "./ProductRow.jsx";
 import StatCard from "./StatCard.jsx";
 import CategoryInventoryChart from "./CategoryInventoryChart.jsx";
 import { computeCategoryBreakdown } from "../lib/products.js";
+import InventoryFilters from "./InventoryFilters.jsx";
 
 function AtainSelectFilter({ label, value, options, theme, onChange }) {
   return (
@@ -176,21 +177,12 @@ export default function InventoryDashboard({
           />
         )}
 
-        <section className={`my-8 ${isAtain ? "flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between" : `grid gap-4 rounded-2xl border p-4 sm:p-5 ${theme.panel}`}`}>
-          <label className={`flex h-11 w-full ${isAtain ? "max-w-xl" : "max-w-none"} items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
-            <Search size={18} />
-            <input
-              value={query}
-              onChange={(event) => onQuery(event.target.value)}
-              className="w-full bg-transparent outline-none"
-              placeholder={
-                isAtain
-                  ? "Buscar por spot, serial, campana, bodega, tipo o hostname..."
-                  : "Buscar producto, categoria, codigo o comentario..."
-              }
-            />
-          </label>
-          {isAtain ? (
+        {isAtain ? (
+          <section className="my-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <label className={`flex h-11 w-full max-w-xl items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
+              <Search size={18} />
+              <input value={query} onChange={(event) => onQuery(event.target.value)} className="w-full bg-transparent outline-none" placeholder="Buscar por spot, serial, campana, bodega, tipo o hostname..." />
+            </label>
             <div className="flex flex-col gap-3 lg:items-end">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {filterOptions.map(([value, label]) => (
@@ -211,33 +203,20 @@ export default function InventoryDashboard({
                 ]}
               />
             </div>
-          ) : (
-            <div className="grid min-w-0 gap-4 xl:grid-cols-[auto_minmax(0,1fr)] xl:items-start">
-              <div className="flex flex-wrap gap-2" aria-label="Filtrar por existencias">
-                {filterOptions.map(([value, label]) => (
-                  <button key={value} type="button" onClick={() => onFilter(value)} aria-pressed={filter === value}
-                    className={`inline-flex min-h-10 items-center justify-center rounded-full border px-4 py-2 text-sm font-bold transition hover:border-[color:var(--brand-accent)] ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {categories.length > 0 && (
-                <div className="flex min-w-0 flex-wrap gap-2 xl:justify-end" aria-label="Filtrar por categoría">
-                  <button type="button" onClick={() => onCategoryFilter("all")} aria-pressed={categoryFilter === "all"}
-                    className={`inline-flex min-h-10 items-center justify-center rounded-full border px-4 py-2 text-sm font-bold transition hover:border-[color:var(--brand-accent)] ${categoryFilter === "all" ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}>
-                    Todas las categorías
-                  </button>
-                  {categories.map((category) => (
-                    <button key={category.key} type="button" onClick={() => onCategoryFilter(categoryFilter === category.key ? "all" : category.key)} aria-pressed={categoryFilter === category.key}
-                      className={`inline-flex min-h-10 items-center justify-center rounded-full border px-4 py-2 text-sm font-bold transition hover:border-[color:var(--brand-accent)] ${categoryFilter === category.key ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}>
-                      {category.label} <span className="ml-1 opacity-75">{category.count}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+          </section>
+        ) : (
+            <InventoryFilters
+              theme={theme}
+              query={query}
+              onQuery={onQuery}
+              filter={filter}
+              onFilter={onFilter}
+              filterOptions={filterOptions}
+              categories={categories}
+              categoryFilter={categoryFilter}
+              onCategoryFilter={onCategoryFilter}
+            />
+        )}
 
         <section className={`overflow-hidden rounded-lg border ${theme.panel}`}>
           <div className="overflow-x-auto">

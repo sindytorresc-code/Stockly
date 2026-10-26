@@ -12,6 +12,7 @@ export default function ClientSelector({
   onCreate,
   onSignOut,
   onJoinCompany,
+  onManageAccessCodes,
 }) {
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -128,6 +129,7 @@ export default function ClientSelector({
             <Plus size={22} />
             Agregar empresa nueva
           </button>
+          {onManageAccessCodes && <button type="button" onClick={onManageAccessCodes} className="flex min-h-20 items-center justify-center gap-3 rounded-lg border-2 border-dashed border-emerald-300 bg-white p-5 font-bold text-emerald-800 transition hover:border-emerald-500 sm:col-span-2"><KeyRound size={22} />Administrar llaves de acceso</button>}
         </div>
 
         {joining && (

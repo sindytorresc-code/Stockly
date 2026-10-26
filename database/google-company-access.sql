@@ -113,6 +113,29 @@ $$;
 revoke all on function public.rotate_company_access_code(uuid) from public, anon;
 grant execute on function public.rotate_company_access_code(uuid) to authenticated;
 
+-- Return only key existence/active flags to administrators of this company.
+-- The code itself is one-time output from rotate_company_access_code; hashes
+-- remain inaccessible through the Data API.
+create or replace function private.company_access_code_status(target_client uuid)
+returns jsonb language plpgsql stable security definer set search_path=pg_catalog, public as $$
+begin
+  if auth.uid() is null or not private.has_client_permission(target_client,'users.manage') then
+    raise exception 'not_authorized';
+  end if;
+  return jsonb_build_object(
+    'active', exists(select 1 from public.company_access_codes where client_id=target_client and active and deactivated_at is null),
+    'everGenerated', exists(select 1 from public.company_access_codes where client_id=target_client)
+  );
+end $$;
+revoke all on function private.company_access_code_status(uuid) from public, anon;
+grant execute on function private.company_access_code_status(uuid) to authenticated;
+create or replace function public.company_access_code_status(target_client uuid)
+returns jsonb language sql stable security invoker set search_path=pg_catalog, public as $$
+  select private.company_access_code_status(target_client)
+$$;
+revoke all on function public.company_access_code_status(uuid) from public, anon;
+grant execute on function public.company_access_code_status(uuid) to authenticated;
+
 create or replace function private.deactivate_company_access_code(target_client uuid)
 returns void language plpgsql security definer set search_path = pg_catalog, public as $$
 begin

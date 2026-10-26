@@ -439,7 +439,11 @@ function validateBrandingInput({ brandColor, logoDataUrl }, { requireColor = tru
   }
 }
 
-export async function updateSupabaseBusinessBranding(clientId, { icon, theme }) {
+export async function updateSupabaseBusinessBranding(clientId, { name, icon, theme }) {
+  const normalizedName = name === undefined ? undefined : String(name).trim();
+  if (normalizedName !== undefined && (!normalizedName || normalizedName.length > 80)) {
+    throw new Error("El nombre de empresa debe tener entre 1 y 80 caracteres.");
+  }
   const validatedTheme = { ...(theme || {}) };
   if (theme?.brandColor) {
     if (!normalizeHexColor(theme.brandColor)) throw new Error("El color de marca debe ser un HEX válido, por ejemplo #db2777.");
@@ -450,7 +454,7 @@ export async function updateSupabaseBusinessBranding(clientId, { icon, theme }) 
   const rows = await supabaseRequest(`/clients?id=eq.${encodeURIComponent(clientId)}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ icon, theme: validatedTheme }),
+    body: JSON.stringify({ ...(normalizedName === undefined ? {} : { name: normalizedName }), icon, theme: validatedTheme }),
   });
   if (!rows?.length) throw new Error("No se pudo guardar la identidad visual. Comprueba el permiso company.manage.");
   return rows[0];
@@ -491,6 +495,13 @@ export async function deactivateClientMembership(clientId, userId) {
 export async function rotateCompanyAccessCode(clientId) {
   const rows = await supabaseRequest("/rpc/rotate_company_access_code", { method: "POST", body: JSON.stringify({ target_client: clientId }) });
   return typeof rows === "string" ? rows : rows?.code || rows;
+}
+
+export async function fetchCompanyAccessCodeStatus(clientId) {
+  return supabaseRequest("/rpc/company_access_code_status", {
+    method: "POST",
+    body: JSON.stringify({ target_client: clientId }),
+  });
 }
 
 export async function deactivateCompanyAccessCode(clientId) {

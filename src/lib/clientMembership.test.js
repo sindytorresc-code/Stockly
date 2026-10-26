@@ -31,9 +31,11 @@ describe("deactivateMembershipRequest", () => {
   it("requires company.manage for branding and denies inactive or non-admin role grants", () => {
     const admin = { role_id: "admin-role", active: true };
     const manager = { role_id: "manager-role", active: true };
+    const employee = { role_id: "employee-role", active: true };
     const grants = [{ role_id: "admin-role", permission_id: "company-manage" }];
     expect(membershipGrantsPermission(admin, "company-manage", grants)).toBe(true);
     expect(membershipGrantsPermission(manager, "company-manage", grants)).toBe(false);
+    expect(membershipGrantsPermission(employee, "company-manage", grants)).toBe(false);
     expect(membershipGrantsPermission({ ...admin, active: false }, "company-manage", grants)).toBe(false);
   });
 });

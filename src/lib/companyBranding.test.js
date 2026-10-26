@@ -56,6 +56,28 @@ describe("persistencia de identidad visual de empresa", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("updates only the visible company name, icon, and theme without sending a slug", async () => {
+    const fetchMock = vi.fn(async (_url, options) => new Response(JSON.stringify([{ id: "mara-id", slug: "mara", name: "Mara Makeup Studio" }]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateSupabaseBusinessBranding } = await import("./supabase.js");
+
+    const result = await updateSupabaseBusinessBranding("mara-id", { name: "  Mara Makeup Studio  ", icon: "sparkles", theme: { brandColor: "#DB2777" } });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ name: "Mara Makeup Studio", icon: "sparkles", theme: { brandColor: "#db2777" } });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty("slug");
+    expect(result.name).toBe("Mara Makeup Studio");
+    await expect(updateSupabaseBusinessBranding("mara-id", { name: "   ", icon: "sparkles", theme: {} })).rejects.toThrow("nombre de empresa");
+  });
+
+  it("reads access-code status through the company-scoped RPC without requesting stored hashes", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ active: true, everGenerated: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchCompanyAccessCodeStatus } = await import("./supabase.js");
+    await expect(fetchCompanyAccessCodeStatus("company-a")).resolves.toEqual({ active: true, everGenerated: true });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/rpc/company_access_code_status");
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("company_access_codes?");
+  });
+
   it("restores each company's persisted theme after reloading and switches themes by company data", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([
       { id: "a", slug: "rosa", name: "Rosa", icon: "sparkles", theme: { brandColor: "#db2777", logoDataUrl: "" } },
