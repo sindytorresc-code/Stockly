@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { UserRoundX, X } from "lucide-react";
+import { Copy, UserRoundX, X } from "lucide-react";
 import {
   deactivateCompanyAccessCode,
   deactivateClientMembership,
@@ -17,6 +17,9 @@ export default function AccessManager({ clientId, businessName, onClose }) {
   const [busyUserId, setBusyUserId] = useState("");
   const [pendingRemoval, setPendingRemoval] = useState(null);
   const [newCode, setNewCode] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
+  const [confirmCodeRotation, setConfirmCodeRotation] = useState(false);
+  const [confirmCodeDeactivation, setConfirmCodeDeactivation] = useState(false);
 
   async function refresh() {
     setBusy(true);
@@ -51,15 +54,34 @@ export default function AccessManager({ clientId, businessName, onClose }) {
   }
 
   async function rotateCode() {
-    setError(""); setNotice(""); setNewCode("");
+    setError(""); setNotice(""); setConfirmCodeRotation(true);
+  }
+
+  async function confirmRotateCode() {
+    setConfirmCodeRotation(false);
+    setError(""); setNotice(""); setNewCode(""); setCopyStatus("");
     try { setNewCode(await rotateCompanyAccessCode(clientId)); }
     catch (e) { setError(e.message || "No se pudo renovar el código."); }
   }
 
   async function deactivateCode() {
-    setError(""); setNotice(""); setNewCode("");
+    setError(""); setNotice(""); setConfirmCodeDeactivation(true);
+  }
+
+  async function confirmDeactivateCode() {
+    setConfirmCodeDeactivation(false);
+    setError(""); setNotice(""); setNewCode(""); setCopyStatus("");
     try { await deactivateCompanyAccessCode(clientId); setNotice("Código de acceso desactivado."); }
     catch (e) { setError(e.message || "No se pudo desactivar el código."); }
+  }
+
+  async function copyNewCode() {
+    try {
+      await navigator.clipboard.writeText(newCode);
+      setCopyStatus("Código copiado.");
+    } catch {
+      setCopyStatus("No se pudo copiar automáticamente; selecciona el código y cópialo manualmente.");
+    }
   }
 
   async function confirmRemoval() {
@@ -93,12 +115,12 @@ export default function AccessManager({ clientId, businessName, onClose }) {
         {busy ? <p>Cargando…</p> : <>
           <section className="mb-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
             <h3 className="font-bold">Código de acceso a la empresa</h3>
-            <p className="mt-1 text-sm text-slate-600">Comparte este código con las personas que deban vincularse. La renovación invalida el código anterior.</p>
+            <p className="mt-1 text-sm text-slate-600">Comparte este código con las personas que deban vincularse. Antes de renovar o desactivar, confirmarás la acción; renovar invalida cualquier código activo anterior.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={rotateCode} className="rounded bg-blue-700 px-3 py-2 text-sm font-bold text-white">Generar o renovar código</button>
               <button type="button" onClick={deactivateCode} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-bold">Desactivar código</button>
             </div>
-            {newCode && <p className="mt-3 break-all rounded bg-white p-3 font-mono text-sm" aria-live="polite">{newCode}<span className="mt-1 block font-sans text-xs text-amber-700">Cópialo ahora; no se puede volver a consultar.</span></p>}
+            {newCode && <div className="mt-3 rounded bg-white p-3" aria-live="polite"><p className="break-all font-mono text-sm">{newCode}</p><p className="mt-1 text-xs text-amber-700">Cópialo ahora; la base de datos conserva únicamente su hash y no se puede volver a consultar.</p><button type="button" onClick={copyNewCode} className="mt-2 inline-flex items-center gap-2 rounded border px-3 py-2 text-sm font-bold"><Copy size={15} /> Copiar código</button>{copyStatus && <p role="status" className="mt-2 text-xs font-semibold text-slate-600">{copyStatus}</p>}</div>}
           </section>
           <form onSubmit={submit} className="mb-5 grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-[1fr_180px_auto]">
             <label className="text-sm font-bold">ID de usuario<input name="userId" required pattern="[0-9a-fA-F-]{36}" placeholder="UUID de Supabase Auth" className="mt-1 h-10 w-full rounded border px-2 font-normal" /></label>
@@ -134,6 +156,20 @@ export default function AccessManager({ clientId, businessName, onClose }) {
             <button type="button" disabled={Boolean(busyUserId)} onClick={() => setPendingRemoval(null)} className="rounded-lg border px-4 py-2 font-bold disabled:opacity-50">Cancelar</button>
             <button type="button" disabled={Boolean(busyUserId)} onClick={confirmRemoval} className="rounded-lg bg-red-700 px-4 py-2 font-bold text-white disabled:opacity-50">{busyUserId ? "Retirando…" : "Confirmar retiro"}</button>
           </div>
+        </section>
+      </div>}
+      {confirmCodeRotation && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4">
+        <section role="alertdialog" aria-labelledby="rotate-code-title" className="w-full max-w-md rounded-xl bg-white p-6 text-slate-950 shadow-2xl">
+          <h3 id="rotate-code-title" className="text-lg font-extrabold">Generar o renovar la llave</h3>
+          <p className="mt-3 text-sm text-slate-600">Se generará una llave nueva. Si hay una llave activa, dejará de funcionar inmediatamente. La llave completa se mostrará una sola vez.</p>
+          <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setConfirmCodeRotation(false)} className="rounded-lg border px-4 py-2 font-bold">Cancelar</button><button type="button" onClick={confirmRotateCode} className="rounded-lg bg-blue-700 px-4 py-2 font-bold text-white">Confirmar y generar</button></div>
+        </section>
+      </div>}
+      {confirmCodeDeactivation && <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4">
+        <section role="alertdialog" aria-labelledby="deactivate-code-title" className="w-full max-w-md rounded-xl bg-white p-6 text-slate-950 shadow-2xl">
+          <h3 id="deactivate-code-title" className="text-lg font-extrabold">Desactivar llave de acceso</h3>
+          <p className="mt-3 text-sm text-slate-600">Las personas ya vinculadas conservarán su acceso. Nadie podrá usar la llave actual para unirse. Esta acción no elimina membresías.</p>
+          <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setConfirmCodeDeactivation(false)} className="rounded-lg border px-4 py-2 font-bold">Cancelar</button><button type="button" onClick={confirmDeactivateCode} className="rounded-lg bg-red-700 px-4 py-2 font-bold text-white">Confirmar desactivación</button></div>
         </section>
       </div>}
     </div>

@@ -232,7 +232,7 @@ export default function App() {
       }
       setBrandingDraft({
         icon: selectedBusiness.icon || "package",
-        brandColor: selectedBusiness.brandConfig?.brandColor || "",
+        brandColor: selectedBusiness.brandConfig?.brandColor || selectedBusiness.theme?.brandColor || "",
         logoDataUrl: selectedBusiness.brandConfig?.logoDataUrl || "",
       });
       setBrandingError("");

@@ -29,4 +29,14 @@ describe("CategoryInventoryChart", () => {
     expect(markup).toContain(theme.accent.split(" ")[0]);
     expect(markup).toContain(theme.softAccent.split(" ")[0]);
   });
+
+  it("keeps category slices visible on Mara's light pink background", () => {
+    const theme = { ...businesses.find((business) => business.id === "mara").theme, brandColor: "#db2777" };
+    const markup = renderToStaticMarkup(
+      <CategoryInventoryChart products={[{ category: "Labial" }, { category: "Cuidado" }]} theme={theme} categoryFilter="all" onCategoryFilter={() => {}} />,
+    );
+    expect(markup).toContain("100%, var(--dashboard-surface)");
+    expect(markup).toContain("74%, var(--dashboard-surface)");
+    expect(markup).toContain('stroke-width="2"');
+  });
 });

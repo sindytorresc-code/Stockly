@@ -10,6 +10,20 @@ export const STANDARD_BRAND_COLORS = [
   { name: "Grafito", value: "#475569" },
 ];
 
+const LEGACY_ACCENT_COLORS = {
+  blue: "#2563eb",
+  pink: "#db2777",
+  violet: "#7c3aed",
+  purple: "#7c3aed",
+  green: "#15803d",
+  emerald: "#059669",
+  gold: "#d97706",
+  amber: "#d97706",
+  orange: "#c2410c",
+  slate: "#475569",
+  stone: "#475569",
+};
+
 export function isValidHexColor(value) {
   return /^#[\da-f]{6}$/i.test(String(value || "").trim());
 }
@@ -41,9 +55,11 @@ function getBrandTokens(hex) {
     "--brand-accent": hex,
     "--brand-accent-dark": `color-mix(in srgb, ${hex} 78%, #111827)`,
     "--brand-soft": `color-mix(in srgb, ${hex} 11%, white)`,
+    "--brand-dark-soft": `color-mix(in srgb, ${hex} 18%, #0f172a)`,
     "--brand-border": `color-mix(in srgb, ${hex} 25%, #e2e8f0)`,
     "--brand-accent-ink": `color-mix(in srgb, ${hex} 70%, #111827)`,
     "--brand-contrast": luminance > 0.179 ? "#111827" : "#ffffff",
+    "--brand-light-ink": `color-mix(in srgb, ${hex} 45%, white)`,
   };
 }
 
@@ -57,18 +73,27 @@ export function resolveBusinessTheme(defaultTheme = {}, configuredTheme = {}) {
     ? configuredTheme
     : {};
   const theme = { ...defaultTheme, ...stored };
+  const legacyAccent = String(stored.accent || "").trim().toLowerCase();
+  const accentBrandColor = LEGACY_ACCENT_COLORS[legacyAccent];
+  if (!normalizeHexColor(theme.brandColor) && accentBrandColor) theme.brandColor = accentBrandColor;
   if (normalizeHexColor(theme.brandColor)) {
+    const isDark = String(theme.mode || defaultTheme.mode || "light").toLowerCase() === "dark";
     theme.brandColor = normalizeHexColor(theme.brandColor);
     theme.header = "from-[var(--brand-accent)] to-[var(--brand-accent-dark)]";
     theme.accent = "bg-[var(--brand-accent)] hover:opacity-90 text-[var(--brand-contrast)]";
-    theme.softAccent = "bg-[var(--brand-soft)] text-[var(--brand-accent-ink)]";
-    theme.appBg = "bg-[var(--brand-soft)]";
-    theme.panel = `${defaultTheme.panel?.replace(/bg-[^ ]+/, "bg-[var(--brand-soft)]").replace(/border-[^ ]+/, "") || "bg-[var(--brand-soft)]"} border-[color:var(--brand-border)]`;
-    theme.panelSoft = `${defaultTheme.panelSoft?.replace(/bg-[^ ]+/, "bg-[var(--brand-soft)]").replace(/border-[^ ]+/, "") || "bg-[var(--brand-soft)]"} border-[color:var(--brand-border)]`;
+    theme.softAccent = isDark
+      ? "bg-[var(--brand-dark-soft)] text-[var(--brand-light-ink)]"
+      : "bg-[var(--brand-soft)] text-[var(--brand-accent-ink)]";
+    theme.appBg = isDark ? defaultTheme.appBg : "bg-[var(--brand-soft)]";
+    const panelSurface = isDark ? undefined : "bg-[var(--brand-soft)]";
+    theme.panel = `${panelSurface ? defaultTheme.panel?.replace(/bg-[^ ]+/, panelSurface) : (defaultTheme.panel || "bg-slate-900").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`;
+    theme.panelSoft = `${panelSurface ? defaultTheme.panelSoft?.replace(/bg-[^ ]+/, panelSurface) : (defaultTheme.panelSoft || "bg-slate-800").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`;
     theme.input = `${defaultTheme.input?.replace(/border-[^ ]+/, "") || "bg-white text-slate-950"} border-[color:var(--brand-border)] focus:border-[color:var(--brand-accent)]`;
     theme.formBorder = "border-[color:var(--brand-border)] focus:border-[color:var(--brand-accent)] focus:ring-[color:var(--brand-soft)]";
     theme.formAccent = "bg-[var(--brand-accent)] hover:opacity-90 text-[var(--brand-contrast)]";
-    theme.tableHead = `${defaultTheme.tableHead?.replace(/bg-[^ ]+/, "") || ""} bg-[var(--brand-soft)]`;
+    theme.tableHead = isDark
+      ? `${defaultTheme.tableHead?.replace(/border-[^ ]+/, "") || "bg-slate-800 text-slate-300"}`
+      : `${defaultTheme.tableHead?.replace(/bg-[^ ]+/, "") || ""} bg-[var(--brand-soft)]`;
     theme.row = "border-[color:var(--brand-border)]";
   }
   return theme;

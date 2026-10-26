@@ -29,7 +29,7 @@ export default function CategoryInventoryChart({ products, theme, categoryFilter
     return {
       ...category,
       path: donutSlicePath(120, 120, 96, 57, start, cursor),
-      mix: Math.max(46, 100 - index * (54 / Math.max(categories.length - 1, 1))),
+      mix: Math.max(74, 100 - index * (26 / Math.max(categories.length - 1, 1))),
     };
   });
 
@@ -63,8 +63,8 @@ export default function CategoryInventoryChart({ products, theme, categoryFilter
                 key={slice.key}
                 d={slice.path}
                 fill={`color-mix(in srgb, var(--dashboard-accent) ${slice.mix}%, var(--dashboard-surface))`}
-                stroke={categoryFilter === slice.key ? "var(--dashboard-surface)" : "transparent"}
-                strokeWidth={categoryFilter === slice.key ? 3 : 0}
+                stroke="var(--dashboard-surface)"
+                strokeWidth={categoryFilter === slice.key ? 4 : 2}
                 className="transition-opacity"
               />
             )) : <circle cx="120" cy="120" r="85" fill="none" stroke="var(--dashboard-accent)" strokeWidth="18" opacity="0.3" />}
@@ -77,7 +77,7 @@ export default function CategoryInventoryChart({ products, theme, categoryFilter
         <div className="grid gap-2 sm:grid-cols-2">
           {categories.length ? categories.map((category, index) => {
             const isSelected = categoryFilter === category.key;
-            const mix = Math.max(46, 100 - index * (54 / Math.max(categories.length - 1, 1)));
+            const mix = Math.max(74, 100 - index * (26 / Math.max(categories.length - 1, 1)));
             return (
               <button
                 key={category.key}

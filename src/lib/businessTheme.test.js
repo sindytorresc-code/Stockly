@@ -32,6 +32,17 @@ describe("resolveBusinessTheme", () => {
     const original = { header: "from-blue-700 to-slate-900", accent: "bg-blue-700" };
     expect(resolveBusinessTheme(original, { logoDataUrl: "data:image/png;base64,AA==" })).toEqual({ ...original, logoDataUrl: "data:image/png;base64,AA==" });
   });
+
+  it("hydrates legacy palette names such as Mara's pink and preserves Atain's dark surfaces", () => {
+    const mara = resolveBusinessTheme(businesses.find((business) => business.id === "mara").theme, { mode: "light", accent: "pink" });
+    const atain = resolveBusinessTheme(businesses.find((business) => business.id === "atain").theme, { mode: "dark", accent: "blue", brandColor: "#2563eb" });
+    expect(mara.brandColor).toBe("#db2777");
+    expect(mara.accent).toContain("--brand-accent");
+    expect(atain.appBg).toBe("bg-slate-950");
+    expect(atain.panel).toContain("bg-slate-900");
+    expect(atain.panelSoft).toContain("bg-slate-800");
+    expect(atain.text).toBe("text-slate-50");
+  });
 });
 
 describe("validación de marca", () => {
