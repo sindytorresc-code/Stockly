@@ -187,13 +187,13 @@ function normalizeCsvHeader(value) {
 }
 
 const productHeaderAliases = {
-  name: ["name", "nombre", "producto", "articulo", "activo"],
-  code: ["code", "codigo", "sku", "serial", "numero de serie"],
+  name: ["name", "nombre", "nombre del producto", "nombre producto", "producto", "articulo", "activo"],
+  code: ["code", "codigo", "codigo del producto", "sku", "referencia", "ref", "serial", "numero de serie"],
   category: ["category", "categoria", "tipo", "modelo"],
-  price: ["price", "precio", "precio de venta", "valor"],
-  purchasePrice: ["purchase price", "precio de compra", "costo", "coste"],
-  stock: ["stock", "existencias", "cantidad", "unidades"],
-  minStock: ["min stock", "stock minimo", "existencia minima"],
+  price: ["price", "precio", "precio de venta", "valor", "venta"],
+  purchasePrice: ["purchase price", "precio de compra", "costo", "coste", "cost", "costo unitario"],
+  stock: ["stock", "existencias", "cantidad", "unidades", "inventario", "qty"],
+  minStock: ["min stock", "stock minimo", "existencia minima", "minimo", "min"],
   tag: ["tag", "estado", "status"],
   brand: ["brand", "marca"],
   spot: ["spot", "ubicacion", "bodega", "sede"],
@@ -202,40 +202,160 @@ const productHeaderAliases = {
   image: ["image", "imagen"],
 };
 
-export function readExcelProducts(input, options = {}) {
+const importFields = ["name", "code", "price", "purchasePrice", "stock", "minStock", "category", "brand", "tag", "comments", "image", "spot", "campaign"];
+const requiredImportFields = new Set(["name", "code", "price", "stock", "category"]);
+const importFieldLabels = {
+  name: "Nombre", code: "Código", price: "Precio de venta", purchasePrice: "Precio de compra",
+  stock: "Stock", minStock: "Stock mínimo", category: "Categoría", brand: "Marca", tag: "Estado",
+  comments: "Comentarios", image: "Imagen", spot: "Ubicación", campaign: "Campaña",
+};
+
+function makeColumnLabels(width) {
+  return Array.from({ length: width }, (_, index) => {
+    let number = index + 1;
+    let label = "";
+    while (number > 0) {
+      number -= 1;
+      label = String.fromCharCode(65 + (number % 26)) + label;
+      number = Math.floor(number / 26);
+    }
+    return `${label}`;
+  });
+}
+
+function detectProductHeaders(rows) {
+  let best = null;
+  rows.slice(0, 15).forEach((row, rowIndex) => {
+    const mapping = {};
+    row.forEach((cell, columnIndex) => {
+      const header = normalizeCsvHeader(cell);
+      const field = importFields.find((candidate) => productHeaderAliases[candidate]?.includes(header));
+      if (field && mapping[field] === undefined) mapping[field] = columnIndex;
+    });
+    const score = Object.keys(mapping).length;
+    const reliable = mapping.name !== undefined && mapping.code !== undefined
+      && score >= 3
+      && ["price", "stock", "category"].some((field) => mapping[field] !== undefined);
+    if (reliable && (!best || score > best.score)) best = { rowIndex, mapping, score };
+  });
+  return best;
+}
+
+export function prepareProductImport(input, { fileName = "", businessId = "" } = {}) {
   let workbook;
   try {
-    workbook = XLSX.read(input, { type: "array", cellDates: false });
+    const type = typeof input === "string" ? "string" : "array";
+    if (type === "array") {
+      const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer ?? input, input.byteOffset ?? 0, input.byteLength);
+      const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
+      const isOle = bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0;
+      const prefix = new TextDecoder().decode(bytes.subarray(0, Math.min(bytes.length, 256))).trimStart();
+      const isSpreadsheetXml = /^(?:<\?xml|<Workbook|<workbook)/i.test(prefix);
+      if (!isZip && !isOle && !isSpreadsheetXml) throw new Error("invalid workbook signature");
+    }
+    workbook = XLSX.read(input, { type, cellDates: false, raw: false });
   } catch {
-    throw new Error("No pude leer el Excel. Verifica que el archivo no este danado.");
+    throw new Error("No pude leer el archivo. Verifica que el Excel o CSV no este danado.");
   }
   const sheetName = workbook.SheetNames.find((name) => normalizeCsvHeader(name) === "inventario") || workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  if (!sheet) throw new Error("El archivo Excel no contiene hojas con datos.");
+  if (!sheet) throw new Error("El archivo no contiene hojas con datos.");
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
-  const headerIndex = rows.findIndex((row) => {
+  if (!rows.some((row) => row.some((cell) => String(cell).trim()))) throw new Error("El archivo esta vacio.");
+  const atainHeaderIndex = businessId === "atain" ? rows.findIndex((row) => {
     const headers = row.map((cell) => normalizeCsvHeader(cell));
-    return (headers.some((header) => productHeaderAliases.name.includes(header)) && headers.some((header) => productHeaderAliases.code.includes(header)))
-      || (options.businessId === "atain" && headers.includes("spot") && headers.includes("modelo") && headers.includes("serial"));
-  });
-  if (headerIndex < 0) throw new Error("No encontre columnas de Nombre y Codigo en la hoja. Revisa los encabezados del archivo.");
-  const headers = rows[headerIndex].map((cell) => normalizeCsvHeader(cell));
-  const fields = Object.entries(productHeaderAliases).map(([field, aliases]) => [field, headers.findIndex((header) => aliases.includes(header))]);
-  const hasAtainColumns = headers.includes("spot") && headers.includes("modelo") && headers.includes("serial");
-  if (options.businessId === "atain" && hasAtainColumns) {
-    return { atainText: XLSX.utils.sheet_to_csv(sheet, { FS: "," }) };
+    return headers.includes("spot") && headers.includes("modelo") && headers.includes("serial");
+  }) : -1;
+  if (atainHeaderIndex >= 0) {
+    const atainText = rows.slice(atainHeaderIndex).map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
+    return { atainText, fileName, sheetName };
   }
-  const indexOf = (field) => fields.find(([key]) => key === field)?.[1] ?? -1;
-  const missing = ["name", "code", "category", "price", "stock"].filter((field) => indexOf(field) < 0);
-  if (missing.length) throw new Error(`Faltan columnas obligatorias: ${missing.map((field) => ({ name: "Nombre", code: "Codigo", category: "Categoria", price: "Precio", stock: "Stock" })[field]).join(", ")}.`);
-  const csv = [
-    ["name", "code", "category", "price", "stock", "tag", "comments", "minStock", "purchasePrice", "brand", "image", "spot", "campaign"],
-    ...rows.slice(headerIndex + 1).filter((row) => row.some((cell) => String(cell).trim())).map((row) => [
-      ...["name", "code", "category", "price", "stock"].map((field) => row[indexOf(field)] ?? ""),
-      ...["tag", "comments", "minStock", "purchasePrice", "brand", "image", "spot", "campaign"].map((field) => indexOf(field) < 0 ? "" : row[indexOf(field)]),
-    ]),
-  ].map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
-  return { products: parseCsvProducts(csv, options) };
+  const header = detectProductHeaders(rows);
+  const width = Math.max(...rows.map((row) => row.length));
+  const columns = makeColumnLabels(width);
+  const headerIndex = header?.rowIndex ?? -1;
+  const dataRows = header ? rows.slice(header.rowIndex + 1) : rows;
+  return {
+    fileName,
+    sheetName,
+    columns,
+    headers: header ? rows[header.rowIndex] : columns.map((column) => `Columna ${column}`),
+    rows: dataRows,
+    headerDetected: Boolean(header),
+    headerRow: header ? header.rowIndex : null,
+    mapping: header?.mapping ?? {},
+    detectionScore: header?.score ?? 0,
+  };
+}
+
+function importNumber(value, { integer = false, defaultValue } = {}) {
+  if (value === undefined || value === null || String(value).trim() === "") return defaultValue;
+  let text = String(value).trim().replace(/[^\d,.-]/g, "");
+  if (text.includes(",") && text.includes(".")) {
+    text = text.lastIndexOf(",") > text.lastIndexOf(".") ? text.replaceAll(".", "").replace(",", ".") : text.replaceAll(",", "");
+  } else if (text.includes(",")) {
+    text = text.replace(",", ".");
+  }
+  const number = Number(text);
+  return Number.isFinite(number) && (!integer || Number.isInteger(number)) ? number : NaN;
+}
+
+export function parseMappedProductImport(draft, mapping) {
+  const missingFields = [...requiredImportFields].filter((field) => mapping[field] === undefined || mapping[field] === null || mapping[field] === "");
+  const assigned = new Map();
+  const mappingConflicts = [];
+  Object.entries(mapping).forEach(([field, column]) => {
+    if (column === undefined || column === null || column === "") return;
+    const previousField = assigned.get(Number(column));
+    if (previousField) mappingConflicts.push(`${importFieldLabels[previousField]} y ${importFieldLabels[field]} usan la misma columna.`);
+    else assigned.set(Number(column), field);
+  });
+  if (missingFields.length || mappingConflicts.length) {
+    return { products: [], issues: [], missingFields: missingFields.map((field) => importFieldLabels[field]), mappingConflicts };
+  }
+  const products = [];
+  const issues = [];
+  const seenCodes = new Set();
+  const startIndex = draft.startIndex || 0;
+  draft.rows.slice(startIndex).forEach((row, index) => {
+    const rowNumber = (draft.headerDetected ? draft.headerRow + 2 : 1) + startIndex + index;
+    if (!row.some((cell) => String(cell).trim())) {
+      issues.push({ row: rowNumber, message: "Fila vacia" });
+      return;
+    }
+    const get = (field) => mapping[field] === undefined || mapping[field] === null || mapping[field] === "" ? "" : row[Number(mapping[field])] ?? "";
+    const product = {
+      name: String(get("name")).trim(), code: String(get("code")).trim(), category: String(get("category")).trim(),
+      price: importNumber(get("price")), purchasePrice: importNumber(get("purchasePrice"), { defaultValue: 0 }),
+      stock: importNumber(get("stock"), { integer: true }), minStock: importNumber(get("minStock"), { integer: true, defaultValue: 3 }),
+      brand: String(get("brand")).trim(), image: String(get("image")).trim(), spot: String(get("spot")).trim(),
+      campaign: String(get("campaign")).trim(), comments: String(get("comments")).trim(),
+    };
+    const rowErrors = [];
+    if (!product.name) rowErrors.push("falta el nombre");
+    if (!product.code) rowErrors.push("falta el código");
+    if (!product.category) rowErrors.push("falta la categoría");
+    if (!Number.isFinite(product.price) || product.price < 0) rowErrors.push("precio de venta inválido");
+    if (!Number.isFinite(product.purchasePrice) || product.purchasePrice < 0) rowErrors.push("precio de compra inválido");
+    if (!Number.isInteger(product.stock) || product.stock < 0) rowErrors.push("stock inválido");
+    if (!Number.isInteger(product.minStock) || product.minStock < 0) rowErrors.push("stock mínimo inválido");
+    const codeKey = product.code.toLocaleLowerCase();
+    if (codeKey && seenCodes.has(codeKey)) rowErrors.push("código repetido dentro del archivo");
+    if (codeKey) seenCodes.add(codeKey);
+    if (rowErrors.length) issues.push({ row: rowNumber, message: rowErrors.join(", ") });
+    else {
+      product.tag = deriveTag(product.stock, String(get("tag") || "En stock").trim());
+      products.push(product);
+    }
+  });
+  return { products, issues, missingFields: [], mappingConflicts: [] };
+}
+
+export function readExcelProducts(input, options = {}) {
+  const draft = prepareProductImport(input, options);
+  if (draft.atainText) return draft;
+  if (!draft.headerDetected) return { ...draft, needsMapping: true };
+  return { ...parseMappedProductImport(draft, draft.mapping), draft };
 }
 
 function cleanCsvText(text) {

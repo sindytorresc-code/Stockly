@@ -5,6 +5,7 @@ import ConfirmDialog from "./components/ui/ConfirmDialog.jsx";
 import InventoryDashboard from "./components/InventoryDashboard.jsx";
 import PasswordModal from "./components/PasswordModal.jsx";
 import AtainImportModal from "./components/AtainImportModal.jsx";
+import ImportMappingModal from "./components/ImportMappingModal.jsx";
 import PinModal from "./components/PinModal.jsx";
 import ProductDrawer from "./components/ProductDrawer.jsx";
 import Toast from "./components/ui/Toast.jsx";
@@ -21,8 +22,7 @@ import {
   describeAtainImportFailure,
   isAtainAssetCsv,
   parseAtainImport,
-  parseCsvProducts,
-  readExcelProducts,
+  prepareProductImport,
   parseProductForm,
   validateProduct,
 } from "./lib/products.js";
@@ -67,6 +67,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [atainImportDraft, setAtainImportDraft] = useState(null);
+  const [importDraft, setImportDraft] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -395,21 +396,11 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     }
   }
 
-  async function importParsedProducts(imported, emptyMessage = "El archivo no tiene productos validos") {
-    if (!imported.length) {
-      showToast(emptyMessage);
-      return;
-    }
-
-    const count = await importProducts(selectedBusiness, imported);
-    showToast(`${count} productos cargados`);
-  }
-
-  async function handleAtainImportConfirm(campaign) {
+  async function handleAtainImportConfirm(campaign, parsed) {
     if (!atainImportDraft || !selectedBusiness) return;
 
     try {
-      const { products: imported, duplicateCount } = parseAtainImport(atainImportDraft.text, { campaign });
+      const { products: imported, duplicateCount } = parsed || parseAtainImport(atainImportDraft.text, { campaign });
       if (!imported.length) {
         showToast(describeAtainImportFailure(atainImportDraft.text));
         return;
@@ -425,6 +416,18 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     } catch (error) {
       console.error(error);
       showToast(formatSupabaseError(error, "No pude guardar los activos. Revisa la conexion con Supabase."));
+    }
+  }
+
+  async function handleMappedImportConfirm(imported) {
+    if (!selectedBusiness || !imported.length) return;
+    try {
+      const count = await importProducts(selectedBusiness, imported);
+      setImportDraft(null);
+      showToast(`${count} productos importados en ${selectedBusiness.name}`);
+    } catch (error) {
+      console.error(error);
+      showToast(formatSupabaseError(error, "No pude guardar los productos. Revisa la conexion con Supabase."));
     }
   }
 
@@ -453,26 +456,17 @@ const handleJoinCompany = useCallback(async (companyCode) => {
       try {
         const lowerName = file.name.toLowerCase();
         const isExcel = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
-        const decoded = isExcel
-          ? readExcelProducts(reader.result, { businessId: selectedBusiness.id })
-          : null;
-        const text = isExcel ? decoded.atainText : decodeCsvText(reader.result);
-        if (isExcel && !decoded.atainText) {
-          await importParsedProducts(decoded.products, "No se encontraron productos validos. Revisa nombres, precios y existencias.");
-          return;
-        }
-        if (!text.trim()) {
+        const content = isExcel ? reader.result : decodeCsvText(reader.result);
+        if (!String(content || "").trim()) {
           showToast("El archivo esta vacio");
           return;
         }
-
-        if (selectedBusiness.id === "atain" && isAtainAssetCsv(text)) {
-          setAtainImportDraft({ text, fileName: file.name });
-          return;
+        const draft = prepareProductImport(content, { fileName: file.name, businessId: selectedBusiness.id });
+        if (draft.atainText && isAtainAssetCsv(draft.atainText)) {
+          setAtainImportDraft({ text: draft.atainText, fileName: file.name });
+        } else {
+          setImportDraft(draft);
         }
-
-        const imported = parseCsvProducts(text, { businessId: selectedBusiness.id });
-        await importParsedProducts(imported);
       } catch (error) {
         console.error(error);
         showToast(formatSupabaseError(error, "No pude procesar el archivo. Verifica sus columnas y datos."));
@@ -585,8 +579,18 @@ const handleJoinCompany = useCallback(async (companyCode) => {
         <AtainImportModal
           theme={theme}
           fileName={atainImportDraft.fileName}
+          text={atainImportDraft.text}
           onClose={() => setAtainImportDraft(null)}
           onConfirm={handleAtainImportConfirm}
+        />
+      )}
+      {importDraft && selectedBusiness && (
+        <ImportMappingModal
+          theme={theme}
+          businessName={selectedBusiness.name}
+          draft={importDraft}
+          onClose={() => setImportDraft(null)}
+          onConfirm={handleMappedImportConfirm}
         />
       )}
 

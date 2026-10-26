@@ -17,6 +17,8 @@ import {
   parseAtainImport,
   dedupeImportProductsByCode,
   readExcelProducts,
+  prepareProductImport,
+  parseMappedProductImport,
   parseProductForm,
   validateProduct,
 } from "./products.js";
@@ -295,13 +297,13 @@ describe("readExcelProducts", () => {
   it("returns ATAIN asset workbooks to the campaign-aware CSV parser", () => {
     const buffer = workbookBuffer([["Activos", [["spot", "modelo", "serial", "hostname"], ["39", "Optiplex", "SER-1", "HOST-1"]]]]);
     const result = readExcelProducts(buffer, { businessId: "atain" });
-    expect(result.atainText).toContain("spot,modelo,serial,hostname");
+    expect(result.atainText).toContain('"spot","modelo","serial","hostname"');
     expect(parseAtainImport(result.atainText, { campaign: "TRN1" }).products).toHaveLength(1);
   });
 
-  it("reports a useful error when required headers are missing", () => {
+  it("returns a manual mapping draft when headers are missing", () => {
     const buffer = workbookBuffer([["Sheet1", [["Producto", "Valor"], ["A", 2]]]]);
-    expect(() => readExcelProducts(buffer, { businessId: "orus" })).toThrow(/Nombre y Codigo/);
+    expect(readExcelProducts(buffer, { businessId: "orus" }).needsMapping).toBe(true);
   });
 
   it("reads legacy XLS workbooks", () => {
@@ -310,6 +312,91 @@ describe("readExcelProducts", () => {
       ["Mouse", "M-1", "Perifericos", 20, 4],
     ]]], "xls");
     expect(readExcelProducts(buffer, { businessId: "orus" }).products[0].code).toBe("M-1");
+  });
+
+  it("reads the SpreadsheetML XLS format used by Stockly exports", () => {
+    const xml = '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inventario"><Table><Row><Cell><Data ss:Type="String">Nombre</Data></Cell><Cell><Data ss:Type="String">Código</Data></Cell><Cell><Data ss:Type="String">Categoría</Data></Cell><Cell><Data ss:Type="String">Precio</Data></Cell><Cell><Data ss:Type="String">Stock</Data></Cell></Row><Row><Cell><Data ss:Type="String">Item</Data></Cell><Cell><Data ss:Type="String">I-XML</Data></Cell><Cell><Data ss:Type="String">General</Data></Cell><Cell><Data ss:Type="Number">20</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell></Row></Table></Worksheet></Workbook>';
+    const buffer = new TextEncoder().encode(xml).buffer;
+    expect(prepareProductImport(buffer, { fileName: "stockly.xls" }).headerDetected).toBe(true);
+  });
+
+  it("detects headers after title rows and ignores accents and extra spaces", () => {
+    const buffer = workbookBuffer([["Datos", [
+      ["Reporte de inventario"],
+      ["  Nombre   del producto ", " referencia ", "Precio", " Costo ", "Cantidad", "Stock minimo", "Categoria", "Marca"],
+      ["Bolso", "B-1", 125000, 70000, 3, 1, "Accesorios", "Marca A"],
+    ]]]);
+    const draft = prepareProductImport(buffer, { fileName: "reporte.xlsx" });
+    expect(draft.headerDetected).toBe(true);
+    expect(draft.headerRow).toBe(1);
+    expect(parseMappedProductImport(draft, draft.mapping).products[0]).toMatchObject({ name: "Bolso", code: "B-1", price: 125000, purchasePrice: 70000, stock: 3, minStock: 1, category: "Accesorios", brand: "Marca A" });
+  });
+
+  it("lets the user map headerless columns without assuming name and code positions", () => {
+    const buffer = workbookBuffer([["Sheet1", [
+      ["C-9", "Jarron", 45, 2, "Hogar"],
+      ["C-10", "Taza", 12, 8, "Cocina"],
+    ]]]);
+    const draft = prepareProductImport(buffer, { fileName: "sin-encabezados.xlsx" });
+    expect(draft.headerDetected).toBe(false);
+    expect(draft.mapping).toEqual({});
+    const result = parseMappedProductImport(draft, { code: 0, name: 1, price: 2, stock: 3, category: 4 });
+    expect(result.products.map((product) => product.name)).toEqual(["Jarron", "Taza"]);
+  });
+
+  it("allows skipping a title row when a headerless table starts later", () => {
+    const buffer = workbookBuffer([["Sheet1", [
+      ["Reporte generado por proveedor"],
+      ["C-1", "Silla", 45, 2, "Hogar"],
+    ]]]);
+    const draft = { ...prepareProductImport(buffer), startIndex: 1 };
+    const result = parseMappedProductImport(draft, { code: 0, name: 1, price: 2, stock: 3, category: 4 });
+    expect(result.products).toHaveLength(1);
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it("accepts CSV through the same preview and mapping flow", () => {
+    const draft = prepareProductImport("Producto,Referencia,Precio,Cantidad,Categoria\nLuz,L-1,19,4,Hogar", { fileName: "stock.csv" });
+    expect(draft.headerDetected).toBe(true);
+    expect(parseMappedProductImport(draft, draft.mapping).products[0].code).toBe("L-1");
+  });
+
+  it("defaults absent optional columns and reports invalid or blank rows", () => {
+    const buffer = workbookBuffer([["Inventario", [
+      ["Nombre", "SKU", "Precio", "Stock", "Categoría"],
+      ["Libro", "L-1", 20, 3, "Lectura"],
+      ["Error", "L-2", "no-numero", -1, ""],
+      ["", "", "", "", ""],
+    ]]]);
+    const draft = prepareProductImport(buffer);
+    const result = parseMappedProductImport(draft, draft.mapping);
+    expect(result.products[0]).toMatchObject({ purchasePrice: 0, minStock: 3, brand: "" });
+    expect(result.products).toHaveLength(1);
+    expect(result.issues).toHaveLength(2);
+    expect(result.issues[0].message).toContain("precio de venta inválido");
+    expect(result.issues[1].message).toContain("Fila vacia");
+  });
+
+  it("flags repeated codes in one file instead of importing duplicate rows", () => {
+    const buffer = workbookBuffer([["Inventario", [
+      ["Nombre", "Código", "Precio", "Stock", "Categoría"],
+      ["Uno", "D-1", 10, 1, "General"],
+      ["Dos", "D-1", 12, 2, "General"],
+    ]]]);
+    const draft = prepareProductImport(buffer);
+    const result = parseMappedProductImport(draft, draft.mapping);
+    expect(result.products).toHaveLength(1);
+    expect(result.issues[0].message).toContain("código repetido");
+  });
+
+  it("reports invalid workbook data clearly", () => {
+    expect(() => prepareProductImport(new Uint8Array([0, 1, 2, 3]))).toThrow(/No pude leer el archivo/);
+  });
+
+  it.each(["orus", "atain", "mara", "vogue", "sabor"])("maps the shared format for %s", (businessId) => {
+    const buffer = workbookBuffer([["Inventario", [["Nombre", "Código", "Precio", "Stock", "Categoría"], ["Item", "I-1", 50, 2, "General"]]]]);
+    const draft = prepareProductImport(buffer, { businessId });
+    expect(parseMappedProductImport(draft, draft.mapping).products[0].code).toBe("I-1");
   });
 });
 
