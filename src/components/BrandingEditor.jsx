@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ImagePlus } from "lucide-react";
-import { STANDARD_BRAND_COLORS, isValidHexColor, validateBrandLogo } from "../lib/businessTheme.js";
+import { businessThemeStyle, STANDARD_BRAND_COLORS, isValidHexColor, validateBrandLogo } from "../lib/businessTheme.js";
 import { iconMap } from "../lib/icons.js";
 
 const ICON_OPTIONS = Object.keys(iconMap);
@@ -44,6 +44,7 @@ export default function BrandingEditor({ value, onChange, error, onError }) {
   }
 
   const PreviewIcon = iconMap[value.icon] || iconMap.package;
+  const previewTokens = businessThemeStyle({ brandColor: previewColor });
 
   return (
     <div className="space-y-4">
@@ -119,11 +120,11 @@ export default function BrandingEditor({ value, onChange, error, onError }) {
 
       <div className="rounded-xl border p-4" style={{ borderColor: `${previewColor}55` }}>
         <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Vista previa</p>
-        <div className="flex items-center gap-3 rounded-lg p-3 text-white" style={{ background: `linear-gradient(135deg, ${previewColor}, color-mix(in srgb, ${previewColor} 72%, #111827))` }}>
+        <div className="flex items-center gap-3 rounded-lg p-3" style={{ color: previewTokens["--brand-contrast"], background: `linear-gradient(135deg, ${previewColor}, color-mix(in srgb, ${previewColor} 72%, #111827))` }}>
           {value.logoDataUrl ? <img src={value.logoDataUrl} alt="" className="size-10 rounded-md bg-white object-contain p-1" /> : <span className="grid size-10 place-items-center rounded-md bg-white/20"><PreviewIcon size={22} /></span>}
           <span className="font-bold">Nombre de la empresa</span>
         </div>
-        <button type="button" className="mt-3 rounded-md px-3 py-2 text-sm font-bold" style={{ backgroundColor: previewColor, color: "white" }}>Botón de ejemplo</button>
+        <button type="button" className="mt-3 rounded-md px-3 py-2 text-sm font-bold" style={{ backgroundColor: previewColor, color: previewTokens["--brand-contrast"] }}>Botón de ejemplo</button>
       </div>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </div>

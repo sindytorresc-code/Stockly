@@ -32,14 +32,18 @@ function getBrandTokens(hex) {
   const red = parseInt(value.slice(0, 2), 16);
   const green = parseInt(value.slice(2, 4), 16);
   const blue = parseInt(value.slice(4, 6), 16);
-  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+  const linearize = (channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = 0.2126 * linearize(red) + 0.7152 * linearize(green) + 0.0722 * linearize(blue);
   return {
     "--brand-accent": hex,
     "--brand-accent-dark": `color-mix(in srgb, ${hex} 78%, #111827)`,
     "--brand-soft": `color-mix(in srgb, ${hex} 11%, white)`,
     "--brand-border": `color-mix(in srgb, ${hex} 25%, #e2e8f0)`,
-    "--brand-accent-ink": luminance > 0.68 ? "#1f2937" : hex,
-    "--brand-contrast": luminance > 0.52 ? "#111827" : "#ffffff",
+    "--brand-accent-ink": `color-mix(in srgb, ${hex} 70%, #111827)`,
+    "--brand-contrast": luminance > 0.179 ? "#111827" : "#ffffff",
   };
 }
 

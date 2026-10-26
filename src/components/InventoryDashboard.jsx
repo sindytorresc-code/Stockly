@@ -90,7 +90,7 @@ export default function InventoryDashboard({
 
   return (
     <>
-      <header className={`bg-gradient-to-br ${theme.header} px-4 py-5 text-white`}>
+      <header className={`bg-gradient-to-br ${theme.header} px-4 py-5 ${theme.brandColor ? "text-[var(--brand-contrast)]" : "text-white"}`}>
         <div className="mx-auto max-w-7xl">
           <button type="button" onClick={onBack} className="mb-5 inline-flex items-center gap-2 font-medium">
             <ArrowLeft size={18} /> Volver a clientes
@@ -101,7 +101,7 @@ export default function InventoryDashboard({
                 {business.brandConfig?.logoDataUrl ? <img src={business.brandConfig.logoDataUrl} alt="" className="size-full object-contain p-1" /> : <Icon size={28} />}
               </span>
               <span>
-                <span className="block text-xs font-extrabold text-white/80">{business.type}</span>
+                <span className={`block text-xs font-extrabold ${theme.brandColor ? "opacity-80" : "text-white/80"}`}>{business.type}</span>
                 <span className="block text-3xl font-extrabold">{business.name}</span>
               </span>
             </div>
