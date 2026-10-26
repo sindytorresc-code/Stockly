@@ -31,7 +31,7 @@ import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasAuthenticatedSession, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, } from "./lib/supabase.js";
+import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
@@ -125,8 +125,8 @@ export default function App() {
       const existing = initialBusinesses.find((item) => item.id === row.slug);
       const defaultTheme = existing?.theme || themeForBusinessType(row.business_type, initialBusinesses, genericBusinessTheme);
       const businessTheme = resolveBusinessTheme(defaultTheme, row.theme);
-      return existing ? { ...existing, name: row.name, type: row.business_type, description: row.description || "", cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme } : {
-        id: row.slug, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package",
+      return existing ? { ...existing, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme } : {
+        id: row.slug, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package",
         cardGradient: businessTheme.header || genericBusinessTheme.header, pin: "", products: [], theme: businessTheme,
       };
     });
@@ -141,6 +141,37 @@ export default function App() {
   useEffect(() => {
     if (authRequired && authReady && authenticated) refreshAuthorizedBusinesses().catch((error) => { console.error(error); setAuthenticated(false); signOut(); });
   }, [authRequired, authReady, authenticated, refreshAuthorizedBusinesses]);
+
+  useEffect(() => {
+    if (!authRequired || !authenticated || !selectedBusiness) return undefined;
+    let stopped = false;
+    let checking = false;
+    const verifyMembership = async () => {
+      if (stopped || checking) return;
+      checking = true;
+      try {
+        if (!selectedBusiness.clientId) throw new Error("No se encontró el ID de empresa en Supabase.");
+        const active = await hasActiveClientMembership(selectedBusiness.clientId);
+        if (!active && !stopped) {
+          stopped = true;
+          setSelectedBusiness(null);
+          setPinBusiness(null);
+          resetSessionFilters();
+          navigateToPath(clientsPath(), true);
+          refreshAuthorizedBusinesses().catch((error) => console.warn("No se pudo actualizar la lista de empresas", error));
+          showToast("Tu acceso a esta empresa fue retirado. Puedes seguir usando tus otras empresas.");
+        }
+      } catch (error) {
+        // A transient network error must not be treated as a revoked membership.
+        console.warn("No se pudo verificar la membresía activa", error);
+      } finally {
+        checking = false;
+      }
+    };
+    void verifyMembership();
+    const timer = window.setInterval(verifyMembership, 5000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [authRequired, authenticated, selectedBusiness, resetSessionFilters, refreshAuthorizedBusinesses, showToast]);
 
   const handleCreateBusiness = useCallback(async ({ name, type, description }) => {
     const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -215,6 +246,10 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     try {
       const client = await fetchSupabaseClient(selectedBusiness.id);
       if (!client) throw new Error("No se encontró la empresa en la base de datos.");
+      if (!(await hasClientPermission(client.id, "users.manage"))) {
+        showToast("Tu rol no tiene permiso para administrar usuarios en esta empresa.");
+        return;
+      }
       setAccessCompany({ id: client.id, name: selectedBusiness.name });
     } catch (error) { showToast(formatSupabaseError(error, "No pude abrir la administración de usuarios")); }
   }, [selectedBusiness, showToast]);

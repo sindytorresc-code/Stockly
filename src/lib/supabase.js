@@ -6,6 +6,7 @@ import {
 } from "./supabaseConfig.js";
 import { normalizeCompanyAccessCode } from "./companyAccessCode.js";
 import { buildGoogleAuthorizeUrl } from "./googleOAuth.js";
+import { deactivateMembershipRequest, membershipGrantsPermission, membershipRevocationResult } from "./clientMembership.js";
 
 export { hasSupabaseConfig, initSupabase, isSupabaseConfigured };
 
@@ -255,6 +256,43 @@ export async function restoreAuthSession() {
   return true;
 }
 
+async function fetchAuthenticatedUser() {
+  const config = await requireSupabaseConfig();
+  if (!accessToken || !(await ensureFreshSession())) return null;
+  const userResponse = await fetch(`${config.url}/auth/v1/user`, {
+    headers: { apikey: config.key, Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!userResponse.ok) throw new Error("No se pudo verificar la sesión actual.");
+  return userResponse.json();
+}
+
+export async function hasActiveClientMembership(clientId) {
+  const user = await fetchAuthenticatedUser();
+  if (!user?.id) return false;
+  const memberships = await supabaseRequest(
+    `/client_memberships?client_id=eq.${encodeURIComponent(clientId)}&user_id=eq.${encodeURIComponent(user.id)}&select=active&limit=1`,
+  );
+  return Boolean(memberships?.some((membership) => membership.active));
+}
+
+export async function hasClientPermission(clientId, permissionCode) {
+  const user = await fetchAuthenticatedUser();
+  if (!user?.id) return false;
+  const memberships = await supabaseRequest(
+    `/client_memberships?client_id=eq.${encodeURIComponent(clientId)}&user_id=eq.${encodeURIComponent(user.id)}&select=role_id,active&limit=1`,
+  );
+  const membership = memberships?.find((item) => item.active);
+  if (!membership) return false;
+  const permissions = await supabaseRequest(`/permissions?code=eq.${encodeURIComponent(permissionCode)}&select=id&limit=1`);
+  const permissionId = permissions?.[0]?.id;
+  if (!permissionId) return false;
+  const rolePermissions = await supabaseRequest(
+    `/role_permissions?role_id=eq.${encodeURIComponent(membership.role_id)}&permission_id=eq.${encodeURIComponent(permissionId)}&select=role_id,permission_id&limit=1`,
+  );
+  return membershipGrantsPermission(membership, permissionId, rolePermissions || []);
+}
+
 export async function signOut() {
   const token = accessToken;
   clearSession();
@@ -402,6 +440,12 @@ export async function saveClientMembership(clientId, userId, roleId) {
     method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({ client_id: clientId, user_id: userId, role_id: roleId, active: true }),
   });
+}
+
+export async function deactivateClientMembership(clientId, userId) {
+  const request = deactivateMembershipRequest(clientId, userId);
+  const rows = await supabaseRequest(request.path, request.options);
+  return membershipRevocationResult(rows);
 }
 
 export async function rotateCompanyAccessCode(clientId) {
