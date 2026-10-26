@@ -114,20 +114,22 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
             </>
           )}
 
-          <label className="grid min-w-0 gap-2 sm:col-span-6">
-            <span className={`text-sm font-bold ${theme.muted}`}>Estado interno</span>
-            <select
-              name="tag"
-              defaultValue={product?.tag || (isAtain ? "Asignado" : "En stock")}
-              className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
-            >
-              {PRODUCT_TAGS.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-          </label>
+          {isAtain && (
+            <label className="grid min-w-0 gap-2 sm:col-span-6">
+              <span className={`text-sm font-bold ${theme.muted}`}>Estado interno</span>
+              <select
+                name="tag"
+                defaultValue={product?.tag || "Asignado"}
+                className={`h-[43px] w-full min-w-0 rounded-lg border px-3 text-sm outline-none transition focus:ring-2 ${theme.input} ${borderClass}`}
+              >
+                {PRODUCT_TAGS.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="grid min-w-0 gap-2 sm:col-span-6">
             <span className={`text-sm font-bold ${theme.muted}`}>Descripcion</span>
@@ -142,7 +144,7 @@ export default function ProductDrawer({ business, theme, product, onClose, onSub
 
         {!isAtain && (
           <p className={`mt-4 text-xs font-semibold ${theme.muted}`}>
-            Si el stock es 0, el estado pasa a Agotado (excepto Reparacion).
+            El estado del inventario se calcula según las existencias y el stock mínimo.
           </p>
         )}
 

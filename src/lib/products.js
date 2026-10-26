@@ -19,19 +19,18 @@ export function tagClass(tag) {
   return "bg-blue-500/15 text-blue-500";
 }
 
-export function matchesSearch(product, query) {
+export function matchesSearch(product, query, { isAtain = true } = {}) {
   if (!query.trim()) return true;
   const needle = query.toLowerCase();
-  return [
+  const values = [
     product.name,
     product.code,
     product.category,
-    product.tag,
-    product.spot,
-    product.campaign,
     product.brand,
     product.comments,
-  ].some((value) => String(value || "").toLowerCase().includes(needle));
+  ];
+  if (isAtain) values.push(product.tag, product.spot, product.campaign);
+  return values.some((value) => String(value || "").toLowerCase().includes(needle));
 }
 
 export function matchesFilter(product, filter) {
@@ -134,7 +133,7 @@ export function parseProductForm(form, editingProduct, isAtain) {
     stock,
     minStock: isAtain ? 1 : Number(form.get("minStock") || 0),
     image: isAtain ? "" : String(form.get("image") || "").trim(),
-    tag: deriveTag(stock, userTag),
+    tag: isAtain ? deriveTag(stock, userTag) : stock === 0 ? "Agotado" : "En stock",
     comments: String(form.get("comments") || "").trim(),
   };
 }
@@ -268,7 +267,7 @@ export function prepareProductImport(input, { fileName = "", businessId = "" } =
   }) : -1;
   if (atainHeaderIndex >= 0) {
     const atainText = rows.slice(atainHeaderIndex).map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
-    return { atainText, fileName, sheetName };
+    return { atainText, fileName, sheetName, businessId };
   }
   const header = detectProductHeaders(rows);
   const width = Math.max(...rows.map((row) => row.length));
@@ -278,6 +277,7 @@ export function prepareProductImport(input, { fileName = "", businessId = "" } =
   return {
     fileName,
     sheetName,
+    businessId,
     columns,
     headers: header ? rows[header.rowIndex] : columns.map((column) => `Columna ${column}`),
     rows: dataRows,
@@ -344,7 +344,9 @@ export function parseMappedProductImport(draft, mapping) {
     if (codeKey) seenCodes.add(codeKey);
     if (rowErrors.length) issues.push({ row: rowNumber, message: rowErrors.join(", ") });
     else {
-      product.tag = deriveTag(product.stock, String(get("tag") || "En stock").trim());
+      product.tag = draft.businessId === "atain"
+        ? deriveTag(product.stock, String(get("tag") || "En stock").trim())
+        : product.stock === 0 ? "Agotado" : "En stock";
       products.push(product);
     }
   });
@@ -735,7 +737,9 @@ export function parseCsvProducts(text, options = {}) {
       category,
       price: Number(price),
       stock: parsedStock,
-      tag: deriveTag(parsedStock, tag || "En stock"),
+      tag: options.businessId === "atain"
+        ? deriveTag(parsedStock, tag || "En stock")
+        : parsedStock === 0 ? "Agotado" : "En stock",
       comments: comments || "",
       minStock: Number(minStock || 3),
       purchasePrice: Number(purchasePrice || 0),

@@ -86,7 +86,7 @@ export default function App() {
   const visibleProducts = useMemo(() => {
     const isAtain = selectedBusiness?.id === "atain";
     return products
-      .filter((product) => matchesSearch(product, query))
+      .filter((product) => matchesSearch(product, query, { isAtain }))
       .filter((product) =>
         isAtain ? matchesAtainFilters(product, filter, campaignFilter) : matchesFilter(product, filter),
       );

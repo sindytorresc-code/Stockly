@@ -171,7 +171,7 @@ export default function InventoryDashboard({
               placeholder={
                 isAtain
                   ? "Buscar por spot, serial, campana, bodega, tipo o hostname..."
-                  : "Buscar producto, categoria, codigo, campana o comentario..."
+                  : "Buscar producto, categoria, codigo o comentario..."
               }
             />
           </label>
@@ -206,7 +206,7 @@ export default function InventoryDashboard({
 
         <section className={`overflow-hidden rounded-lg border ${theme.panel}`}>
           <div className="overflow-x-auto">
-            <table className={`w-full border-collapse ${isAtain ? "min-w-[980px]" : "min-w-[1120px]"} table-fixed`}>
+            <table className={`w-full border-collapse ${isAtain ? "min-w-[980px]" : "min-w-[1000px]"} table-fixed`}>
               <thead className={theme.tableHead}>
                 <tr className="text-left text-xs font-extrabold uppercase tracking-wide">
                   {isAtain ? (
@@ -225,8 +225,7 @@ export default function InventoryDashboard({
                       <th className="w-[11%] px-4 py-4">Categoria</th>
                       <th className="w-[10%] px-4 py-4">Precio</th>
                       <th className="w-[12%] px-4 py-4">Existencias</th>
-                      <th className="w-[11%] px-4 py-4">Estado</th>
-                      <th className="w-[16%] px-4 py-4">Comentarios</th>
+                      <th className="w-[21%] px-4 py-4">Comentarios</th>
                     </>
                   )}
                   <th className="w-[10%] px-4 py-4">Acciones</th>

@@ -67,6 +67,12 @@ describe("matchesSearch", () => {
     expect(matchesSearch(product, "diagnostico")).toBe(true);
     expect(matchesSearch(product, "inexistente")).toBe(false);
   });
+
+  it("does not search Atain-only states and campaigns for general businesses", () => {
+    expect(matchesSearch(product, "reparacion", { isAtain: false })).toBe(false);
+    expect(matchesSearch(product, "priceline", { isAtain: false })).toBe(false);
+    expect(matchesSearch(product, "diagnostico", { isAtain: false })).toBe(true);
+  });
 });
 
 describe("validateProduct", () => {
@@ -97,7 +103,7 @@ describe("validateProduct", () => {
 });
 
 describe("parseProductForm", () => {
-  it("derives tag from stock and user selection", () => {
+  it("keeps the selected internal state for Atain", () => {
     const form = new FormData();
     form.set("name", "Teclado");
     form.set("code", "TC-001");
@@ -107,8 +113,19 @@ describe("parseProductForm", () => {
     form.set("tag", "Reparacion");
     form.set("comments", "");
 
-    const product = parseProductForm(form, null, false);
+    const product = parseProductForm(form, null, true);
     expect(product.tag).toBe("Reparacion");
+  });
+
+  it("uses stock-derived status for general companies and ignores internal tags", () => {
+    const form = new FormData();
+    form.set("name", "Teclado");
+    form.set("code", "TC-001");
+    form.set("category", "Perifericos");
+    form.set("price", "1000");
+    form.set("stock", "0");
+    form.set("tag", "Campana");
+    expect(parseProductForm(form, null, false).tag).toBe("Agotado");
   });
 
   it("keeps editing code when FormData omits disabled code field", () => {

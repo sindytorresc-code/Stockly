@@ -86,9 +86,6 @@ export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }
       <td className="px-4 py-3 font-extrabold">
         {product.stock} <StockPill product={product} />
       </td>
-      <td className="px-4 py-3">
-        <Pill className={tagClass(product.tag)}>{product.tag}</Pill>
-      </td>
       <td className={`truncate px-4 py-3 text-sm font-semibold ${theme.muted}`} title={product.comments || ""}>
         {product.comments || "Sin comentarios"}
       </td>
