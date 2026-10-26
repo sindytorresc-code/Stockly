@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./businessTheme.js";
+import { businessThemeStyle, genericBusinessTheme, isValidHexColor, resolveBusinessTheme, themeForBusinessType, validateBrandLogo } from "./businessTheme.js";
 import { businesses } from "../data/businesses.js";
 
 describe("resolveBusinessTheme", () => {
@@ -17,5 +17,33 @@ describe("resolveBusinessTheme", () => {
   it("selects the existing brand theme by business type without matching company names", () => {
     expect(themeForBusinessType("cosmeticos", businesses, genericBusinessTheme)).toBe(businesses.find((item) => item.id === "mara").theme);
     expect(themeForBusinessType("restaurante", businesses, genericBusinessTheme)).toBe(genericBusinessTheme);
+  });
+
+  it("applies a persisted custom brand color to real theme tokens", () => {
+    const theme = resolveBusinessTheme(genericBusinessTheme, { brandColor: "#DB2777" });
+    expect(theme.brandColor).toBe("#db2777");
+    expect(theme.header).toContain("--brand-accent");
+    expect(theme.accent).toContain("--brand-accent");
+    expect(theme.panel).toContain("--brand-soft");
+    expect(businessThemeStyle(theme)["--brand-accent"]).toBe("#db2777");
+  });
+
+  it("preserves a company's current visual theme until a custom brand color is chosen", () => {
+    const original = { header: "from-blue-700 to-slate-900", accent: "bg-blue-700" };
+    expect(resolveBusinessTheme(original, { logoDataUrl: "data:image/png;base64,AA==" })).toEqual({ ...original, logoDataUrl: "data:image/png;base64,AA==" });
+  });
+});
+
+describe("validación de marca", () => {
+  it("accepts only six-digit HEX brand colors", () => {
+    expect(isValidHexColor("#DB2777")).toBe(true);
+    expect(isValidHexColor("#d27")).toBe(false);
+    expect(isValidHexColor("red")).toBe(false);
+  });
+
+  it("allows small raster logos and rejects unsupported or oversized files", () => {
+    expect(validateBrandLogo({ type: "image/png", size: 1000 })).toBe("");
+    expect(validateBrandLogo({ type: "image/svg+xml", size: 1000 })).toContain("PNG");
+    expect(validateBrandLogo({ type: "image/jpeg", size: 251 * 1024 })).toContain("250 KB");
   });
 });

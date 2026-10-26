@@ -69,6 +69,7 @@ export default function InventoryDashboard({
   showHistory = false,
   onToggleHistory,
   onManageAccess,
+  onManageBranding,
 }) {
   const Icon = iconMap[business.icon] || iconMap.package;
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
@@ -96,8 +97,8 @@ export default function InventoryDashboard({
           </button>
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <span className="grid size-14 place-items-center rounded-2xl bg-white/20">
-                <Icon size={28} />
+              <span className="grid size-14 place-items-center overflow-hidden rounded-2xl bg-white/20">
+                {business.brandConfig?.logoDataUrl ? <img src={business.brandConfig.logoDataUrl} alt="" className="size-full object-contain p-1" /> : <Icon size={28} />}
               </span>
               <span>
                 <span className="block text-xs font-extrabold text-white/80">{business.type}</span>
@@ -117,6 +118,7 @@ export default function InventoryDashboard({
               </button>
               <button type="button" onClick={onToggleHistory} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Historial</button>
               {onManageAccess && <button type="button" onClick={onManageAccess} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Usuarios y roles</button>}
+              {onManageBranding && <button type="button" onClick={onManageBranding} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Personalizar marca</button>}
               {onChangePassword && <button
                 type="button"
                 onClick={onChangePassword}

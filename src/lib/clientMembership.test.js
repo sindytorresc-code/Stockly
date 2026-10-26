@@ -27,4 +27,13 @@ describe("deactivateMembershipRequest", () => {
     expect(membershipGrantsPermission({ ...activeAdmin, active: false }, "users-manage", permissions)).toBe(false);
     expect(membershipGrantsPermission({ ...activeAdmin, role_id: "viewer-role" }, "users-manage", permissions)).toBe(false);
   });
+
+  it("requires company.manage for branding and denies inactive or non-admin role grants", () => {
+    const admin = { role_id: "admin-role", active: true };
+    const manager = { role_id: "manager-role", active: true };
+    const grants = [{ role_id: "admin-role", permission_id: "company-manage" }];
+    expect(membershipGrantsPermission(admin, "company-manage", grants)).toBe(true);
+    expect(membershipGrantsPermission(manager, "company-manage", grants)).toBe(false);
+    expect(membershipGrantsPermission({ ...admin, active: false }, "company-manage", grants)).toBe(false);
+  });
 });

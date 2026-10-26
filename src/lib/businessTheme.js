@@ -1,8 +1,73 @@
+export const STANDARD_BRAND_COLORS = [
+  { name: "Índigo", value: "#4f46e5" },
+  { name: "Azul", value: "#2563eb" },
+  { name: "Rosa", value: "#db2777" },
+  { name: "Violeta", value: "#7c3aed" },
+  { name: "Verde", value: "#15803d" },
+  { name: "Esmeralda", value: "#059669" },
+  { name: "Ámbar", value: "#d97706" },
+  { name: "Terracota", value: "#c2410c" },
+  { name: "Grafito", value: "#475569" },
+];
+
+export function isValidHexColor(value) {
+  return /^#[\da-f]{6}$/i.test(String(value || "").trim());
+}
+
+export function normalizeHexColor(value) {
+  const normalized = String(value || "").trim();
+  return isValidHexColor(normalized) ? normalized.toLowerCase() : "";
+}
+
+export function validateBrandLogo(file) {
+  if (!file) return "";
+  const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+  if (!allowedTypes.includes(file.type)) return "El logo debe ser PNG, JPG o WebP.";
+  if (file.size > 250 * 1024) return "El logo debe pesar 250 KB o menos.";
+  return "";
+}
+
+function getBrandTokens(hex) {
+  const value = hex.slice(1);
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+  return {
+    "--brand-accent": hex,
+    "--brand-accent-dark": `color-mix(in srgb, ${hex} 78%, #111827)`,
+    "--brand-soft": `color-mix(in srgb, ${hex} 11%, white)`,
+    "--brand-border": `color-mix(in srgb, ${hex} 25%, #e2e8f0)`,
+    "--brand-accent-ink": luminance > 0.68 ? "#1f2937" : hex,
+    "--brand-contrast": luminance > 0.52 ? "#111827" : "#ffffff",
+  };
+}
+
+export function businessThemeStyle(theme = {}) {
+  const brandColor = normalizeHexColor(theme.brandColor);
+  return brandColor ? getBrandTokens(brandColor) : undefined;
+}
+
 export function resolveBusinessTheme(defaultTheme = {}, configuredTheme = {}) {
   const stored = configuredTheme && typeof configuredTheme === "object" && !Array.isArray(configuredTheme)
     ? configuredTheme
     : {};
-  return { ...defaultTheme, ...stored };
+  const theme = { ...defaultTheme, ...stored };
+  if (normalizeHexColor(theme.brandColor)) {
+    theme.brandColor = normalizeHexColor(theme.brandColor);
+    theme.header = "from-[var(--brand-accent)] to-[var(--brand-accent-dark)]";
+    theme.accent = "bg-[var(--brand-accent)] hover:opacity-90 text-[var(--brand-contrast)]";
+    theme.softAccent = "bg-[var(--brand-soft)] text-[var(--brand-accent-ink)]";
+    theme.appBg = "bg-[var(--brand-soft)]";
+    theme.panel = `${defaultTheme.panel?.replace(/bg-[^ ]+/, "bg-[var(--brand-soft)]").replace(/border-[^ ]+/, "") || "bg-[var(--brand-soft)]"} border-[color:var(--brand-border)]`;
+    theme.panelSoft = `${defaultTheme.panelSoft?.replace(/bg-[^ ]+/, "bg-[var(--brand-soft)]").replace(/border-[^ ]+/, "") || "bg-[var(--brand-soft)]"} border-[color:var(--brand-border)]`;
+    theme.input = `${defaultTheme.input?.replace(/border-[^ ]+/, "") || "bg-white text-slate-950"} border-[color:var(--brand-border)] focus:border-[color:var(--brand-accent)]`;
+    theme.formBorder = "border-[color:var(--brand-border)] focus:border-[color:var(--brand-accent)] focus:ring-[color:var(--brand-soft)]";
+    theme.formAccent = "bg-[var(--brand-accent)] hover:opacity-90 text-[var(--brand-contrast)]";
+    theme.tableHead = `${defaultTheme.tableHead?.replace(/bg-[^ ]+/, "") || ""} bg-[var(--brand-soft)]`;
+    theme.row = "border-[color:var(--brand-border)]";
+  }
+  return theme;
 }
 
 export function themeForBusinessType(type, businesses, fallbackTheme) {

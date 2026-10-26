@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Plus, X, KeyRound } from "lucide-react";
 import { businesses } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
+import BrandingEditor from "./BrandingEditor.jsx";
+import { businessThemeStyle, isValidHexColor } from "../lib/businessTheme.js";
 
 export default function ClientSelector({
   onSelect,
@@ -16,6 +18,7 @@ export default function ClientSelector({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
+  const [brand, setBrand] = useState({ brandColor: "#4f46e5", icon: "package", logoDataUrl: "" });
 
   async function submit(event) {
     event.preventDefault();
@@ -27,6 +30,10 @@ export default function ClientSelector({
       setError("Completa el nombre y el tipo de empresa.");
       return;
     }
+    if (!isValidHexColor(brand.brandColor)) {
+      setError("Escribe un color HEX válido antes de guardar.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -36,6 +43,7 @@ export default function ClientSelector({
         name,
         type,
         description: String(form.get("description") || "").trim(),
+        ...brand,
       });
       setCreating(false);
       setError("");
@@ -113,6 +121,7 @@ export default function ClientSelector({
               setJoining(false);
               setError("");
               setSuccess("");
+              setBrand({ brandColor: "#4f46e5", icon: "package", logoDataUrl: "" });
             }}
             className="flex min-h-20 items-center justify-center gap-3 rounded-lg border-2 border-dashed border-slate-300 bg-white p-5 font-bold text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
           >
@@ -188,9 +197,10 @@ export default function ClientSelector({
                   className={`flex min-h-36 items-center gap-4 bg-gradient-to-br ${
                     business.cardGradient || "from-blue-600 to-cyan-500"
                   } p-6 text-white`}
+                  style={businessThemeStyle(business.theme)}
                 >
                   <span className="grid size-12 place-items-center rounded-lg bg-white/20">
-                    <Icon size={24} />
+                    {business.brandConfig?.logoDataUrl ? <img src={business.brandConfig.logoDataUrl} alt="" className="size-12 rounded-lg bg-white object-contain p-1" /> : <Icon size={24} />}
                   </span>
                   <span>
                     <span className="block text-xs font-extrabold text-white/80">
@@ -216,7 +226,7 @@ export default function ClientSelector({
           <form
             onSubmit={submit}
             aria-label="Agregar empresa"
-            className="w-full max-w-md rounded-xl bg-white p-6 text-slate-950 shadow-2xl"
+            className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 text-slate-950 shadow-2xl"
           >
             <div className="mb-5 flex items-center justify-between">
               <div>
@@ -264,7 +274,9 @@ export default function ClientSelector({
               />
             </label>
 
-            {error && (
+            <BrandingEditor value={brand} onChange={setBrand} error={error} onError={setError} />
+
+            {error && !error.includes("HEX") && !error.includes("logo") && (
               <p role="alert" className="mb-3 break-words text-sm text-red-700">
                 {error}
               </p>

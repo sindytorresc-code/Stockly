@@ -6,6 +6,8 @@ import {
   signInWithPassword,
   signUpWithPassword,
 } from "../lib/supabase.js";
+import BrandingEditor from "./BrandingEditor.jsx";
+import { isValidHexColor } from "../lib/businessTheme.js";
 
 export default function SignIn({
   onSignedIn,
@@ -17,6 +19,7 @@ export default function SignIn({
   const [busy, setBusy] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
+  const [companyBrand, setCompanyBrand] = useState({ brandColor: "#4f46e5", icon: "package", logoDataUrl: "" });
 
   async function submit(event) {
     event.preventDefault();
@@ -72,10 +75,15 @@ export default function SignIn({
       name: String(data.get("companyName") || "").trim(),
       type: String(data.get("companyType") || "").trim(),
       description: String(data.get("companyDescription") || "").trim(),
+      ...companyBrand,
     };
 
     if (!draft.name || !draft.type) {
       setError("Completa el nombre y el tipo de empresa.");
+      return;
+    }
+    if (!isValidHexColor(draft.brandColor)) {
+      setError("Escribe un color HEX válido antes de guardar.");
       return;
     }
 
@@ -192,6 +200,7 @@ export default function SignIn({
             onClick={() => {
               setError("");
               setCreatingCompany(true);
+                setCompanyBrand({ brandColor: "#4f46e5", icon: "package", logoDataUrl: "" });
             }}
             className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-5 font-bold text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
           >
@@ -204,7 +213,7 @@ export default function SignIn({
             <form
               onSubmit={submitCompany}
               aria-label="Registrar empresa"
-              className="w-full max-w-md rounded-xl bg-white p-6 text-slate-950 shadow-2xl"
+              className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 text-slate-950 shadow-2xl"
             >
               <div className="mb-5 flex items-center justify-between">
                 <div>
@@ -253,6 +262,8 @@ export default function SignIn({
                   className="mt-1 h-11 w-full rounded-lg border px-3"
                 />
               </label>
+
+              <BrandingEditor value={companyBrand} onChange={setCompanyBrand} error={error} onError={setError} />
 
               <p className="mb-4 text-xs text-slate-500">
                 Continuarás con Google. La cuenta que complete el registro

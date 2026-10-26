@@ -47,7 +47,7 @@ describe("registro de empresa desde inicio de sesión", () => {
     location.href = "https://owner.github.io/Stockly/?code=oauth-code";
     expect(await completeGoogleSignIn()).toBe(true);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/rpc/join_company_with_code"))).toBe(false);
-    expect(consumePendingCompanyDraft()).toEqual({ name: "Acme", type: "Retail", description: "Inventory" });
+    expect(consumePendingCompanyDraft()).toEqual({ name: "Acme", type: "Retail", description: "Inventory", icon: "package", brandColor: "#4f46e5", logoDataUrl: "" });
     expect(consumePendingCompanyDraft()).toBeNull();
   });
 

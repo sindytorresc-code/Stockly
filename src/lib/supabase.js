@@ -7,6 +7,7 @@ import {
 import { normalizeCompanyAccessCode } from "./companyAccessCode.js";
 import { buildGoogleAuthorizeUrl } from "./googleOAuth.js";
 import { deactivateMembershipRequest, membershipGrantsPermission, membershipRevocationResult } from "./clientMembership.js";
+import { normalizeHexColor, validateBrandLogo } from "./businessTheme.js";
 
 export { hasSupabaseConfig, initSupabase, isSupabaseConfigured };
 
@@ -161,10 +162,14 @@ export async function registerCompanyWithGoogle(draft) {
     name: String(draft?.name || "").trim(),
     type: String(draft?.type || "").trim(),
     description: String(draft?.description || "").trim(),
+    icon: String(draft?.icon || "package"),
+    brandColor: normalizeHexColor(draft?.brandColor || "#4f46e5"),
+    logoDataUrl: String(draft?.logoDataUrl || ""),
   };
   if (!cleanDraft.name || !cleanDraft.type || cleanDraft.name.length > 80 || cleanDraft.type.length > 60 || cleanDraft.description.length > 200) {
     throw new Error("Revisa los datos de la empresa antes de continuar.");
   }
+  validateBrandingInput(cleanDraft);
   sessionStorage.setItem(COMPANY_DRAFT_KEY, JSON.stringify(cleanDraft));
   return beginGoogleOAuth({ mode: "create-company" });
 }
@@ -409,11 +414,46 @@ export async function fetchSupabaseProducts(clientId) {
 }
 
 export async function createSupabaseBusiness(business) {
-  const rows = await supabaseRequest("/rpc/create_company", {
+  await supabaseRequest("/rpc/create_company", {
     method: "POST",
     body: JSON.stringify({ company_slug: business.id, company_name: business.name, company_type: business.type, company_description: business.description }),
   });
-  return rows || null;
+  const client = await fetchSupabaseClient(business.id);
+  if (!client) throw new Error("La empresa se creó, pero no se pudo recuperar su configuración.");
+  await updateSupabaseBusinessBranding(client.id, {
+    icon: business.icon || "package",
+    theme: business.brandConfig || { brandColor: business.brandColor, logoDataUrl: business.logoDataUrl || "" },
+  });
+  return client;
+}
+
+function validateBrandingInput({ brandColor, logoDataUrl }, { requireColor = true } = {}) {
+  if (requireColor && !normalizeHexColor(brandColor)) throw new Error("El color de marca debe ser un HEX válido, por ejemplo #db2777.");
+  if (brandColor && !normalizeHexColor(brandColor)) throw new Error("El color de marca debe ser un HEX válido, por ejemplo #db2777.");
+  if (logoDataUrl) {
+    const fileLike = { type: logoDataUrl.match(/^data:(image\/[a-z]+);base64,/)?.[1] || "", size: Math.ceil(logoDataUrl.length * 0.75) };
+    const logoError = validateBrandLogo(fileLike);
+    if (logoError || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z\d+/]+=*$/.test(logoDataUrl)) {
+      throw new Error(logoError || "El formato del logo no es válido.");
+    }
+  }
+}
+
+export async function updateSupabaseBusinessBranding(clientId, { icon, theme }) {
+  const validatedTheme = { ...(theme || {}) };
+  if (theme?.brandColor) {
+    if (!normalizeHexColor(theme.brandColor)) throw new Error("El color de marca debe ser un HEX válido, por ejemplo #db2777.");
+    validatedTheme.brandColor = normalizeHexColor(theme.brandColor);
+  }
+  else delete validatedTheme.brandColor;
+  validateBrandingInput(validatedTheme, { requireColor: false });
+  const rows = await supabaseRequest(`/clients?id=eq.${encodeURIComponent(clientId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ icon, theme: validatedTheme }),
+  });
+  if (!rows?.length) throw new Error("No se pudo guardar la identidad visual. Comprueba el permiso company.manage.");
+  return rows[0];
 }
 
 export async function fetchSupabaseMovements(clientId) {

@@ -28,13 +28,14 @@ import {
   validateProduct,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
-import { genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
+import { businessThemeStyle, genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, } from "./lib/supabase.js";
+import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
+import BrandingEditor from "./components/BrandingEditor.jsx";
 
 export default function App() {
   const [businesses, setBusinesses] = useState(initialBusinesses);
@@ -76,6 +77,10 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyRows, setHistoryRows] = useState([]);
   const [accessCompany, setAccessCompany] = useState(null);
+  const [brandingOpen, setBrandingOpen] = useState(false);
+  const [brandingDraft, setBrandingDraft] = useState(null);
+  const [brandingError, setBrandingError] = useState("");
+  const [canManageBranding, setCanManageBranding] = useState(false);
 
   useEffect(() => {
     if (!authRequired) return;
@@ -84,6 +89,7 @@ export default function App() {
   }, [authRequired]);
 
   const theme = selectedBusiness?.theme || pinBusiness?.theme || businesses[0]?.theme || initialBusinesses[0].theme;
+  const themeStyle = businessThemeStyle(theme);
   const products = selectedBusiness ? productsByBusiness[selectedBusiness.id] || [] : [];
 
   const visibleProducts = useMemo(() => {
@@ -125,9 +131,9 @@ export default function App() {
       const existing = initialBusinesses.find((item) => item.id === row.slug);
       const defaultTheme = existing?.theme || themeForBusinessType(row.business_type, initialBusinesses, genericBusinessTheme);
       const businessTheme = resolveBusinessTheme(defaultTheme, row.theme);
-      return existing ? { ...existing, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme } : {
+      return existing ? { ...existing, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || existing.icon, cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme, brandConfig: row.theme || {} } : {
         id: row.slug, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package",
-        cardGradient: businessTheme.header || genericBusinessTheme.header, pin: "", products: [], theme: businessTheme,
+        cardGradient: businessTheme.header || genericBusinessTheme.header, pin: "", products: [], theme: businessTheme, brandConfig: row.theme || {},
       };
     });
     setBusinesses(mapped);
@@ -141,6 +147,16 @@ export default function App() {
   useEffect(() => {
     if (authRequired && authReady && authenticated) refreshAuthorizedBusinesses().catch((error) => { console.error(error); setAuthenticated(false); signOut(); });
   }, [authRequired, authReady, authenticated, refreshAuthorizedBusinesses]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCanManageBranding(false);
+    if (!authRequired || !authenticated || !selectedBusiness?.clientId) return undefined;
+    hasClientPermission(selectedBusiness.clientId, "company.manage")
+      .then((allowed) => { if (!cancelled) setCanManageBranding(allowed); })
+      .catch(() => { if (!cancelled) setCanManageBranding(false); });
+    return () => { cancelled = true; };
+  }, [authRequired, authenticated, selectedBusiness?.clientId]);
 
   useEffect(() => {
     if (!authRequired || !authenticated || !selectedBusiness) return undefined;
@@ -173,11 +189,12 @@ export default function App() {
     return () => { stopped = true; window.clearInterval(timer); };
   }, [authRequired, authenticated, selectedBusiness, resetSessionFilters, refreshAuthorizedBusinesses, showToast]);
 
-  const handleCreateBusiness = useCallback(async ({ name, type, description }) => {
+  const handleCreateBusiness = useCallback(async ({ name, type, description, icon = "package", brandColor = "#4f46e5", logoDataUrl = "" }) => {
     const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (!slug || businesses.some((business) => business.id === slug)) throw new Error("Ya existe una empresa con ese nombre.");
-    const theme = themeForBusinessType(type, initialBusinesses, genericBusinessTheme);
-    const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon: "package", cardGradient: theme.header, pin: "", products: [], theme };
+    const brandConfig = { brandColor, logoDataUrl };
+    const theme = resolveBusinessTheme(themeForBusinessType(type, initialBusinesses, genericBusinessTheme), brandConfig);
+    const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon, brandColor, logoDataUrl, brandConfig, cardGradient: theme.header, pin: "", products: [], theme };
     if (!authRequired) {
       setBusinesses((current) => [...current, business]);
       showToast("Empresa agregada en modo demo; activa el acceso seguro para guardarla en Supabase.");
@@ -204,6 +221,46 @@ export default function App() {
     setAccessCompany({ id: client.id, name: createdBusiness.name });
     showToast("Empresa creada. Genera su código de acceso y configura a sus usuarios.");
   }, [businesses, showToast, authRequired, refreshAuthorizedBusinesses, resetSessionFilters]);
+
+  const handleOpenBranding = useCallback(async () => {
+    if (!selectedBusiness?.clientId) return;
+    try {
+      if (!(await hasClientPermission(selectedBusiness.clientId, "company.manage"))) {
+        setCanManageBranding(false);
+        showToast("Tu rol no tiene permiso company.manage para cambiar la identidad visual.");
+        return;
+      }
+      setBrandingDraft({
+        icon: selectedBusiness.icon || "package",
+        brandColor: selectedBusiness.brandConfig?.brandColor || "",
+        logoDataUrl: selectedBusiness.brandConfig?.logoDataUrl || "",
+      });
+      setBrandingError("");
+      setBrandingOpen(true);
+    } catch (error) {
+      showToast(formatSupabaseError(error, "No pude verificar el permiso de marca"));
+    }
+  }, [selectedBusiness, showToast]);
+
+  const handleSaveBranding = useCallback(async () => {
+    if (!selectedBusiness?.clientId || !brandingDraft) return;
+    if (brandingError) return;
+    try {
+      if (!(await hasClientPermission(selectedBusiness.clientId, "company.manage"))) {
+        setCanManageBranding(false);
+        throw new Error("Tu rol no tiene permiso company.manage para cambiar la identidad visual.");
+      }
+      const themeConfig = { ...(selectedBusiness.brandConfig || {}), ...(brandingDraft.brandColor ? { brandColor: brandingDraft.brandColor } : {}), logoDataUrl: brandingDraft.logoDataUrl || "" };
+      await updateSupabaseBusinessBranding(selectedBusiness.clientId, { icon: brandingDraft.icon, theme: themeConfig });
+      const mapped = await refreshAuthorizedBusinesses();
+      const updatedBusiness = mapped.find((business) => business.clientId === selectedBusiness.clientId);
+      if (updatedBusiness) setSelectedBusiness(updatedBusiness);
+      setBrandingOpen(false);
+      showToast("Identidad visual guardada para todos los miembros de la empresa.");
+    } catch (error) {
+      setBrandingError(formatSupabaseError(error, "No pude guardar la identidad visual"));
+    }
+  }, [selectedBusiness, brandingDraft, brandingError, refreshAuthorizedBusinesses, showToast]);
 
 const handleJoinCompany = useCallback(async (companyCode) => {
   if (!(await initSupabase())) {
@@ -552,7 +609,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
   }
 
   return (
-    <div className={`min-h-screen ${theme.appBg} ${theme.text}`}>
+    <div className={`min-h-screen ${theme.appBg} ${theme.text}`} style={themeStyle}>
       {authRequired && !authReady ? <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-500">Restaurando sesión…</main> : authRequired && !authenticated ? <SignIn initialError={authError} onRegisterCompany={registerCompanyWithGoogle} onSignedIn={() => { setAuthError(""); setAuthenticated(true); }} /> : !selectedBusiness ? (
         <ClientSelector businesses={businesses} onSelect={openPin} onCreate={handleCreateBusiness} onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined} onJoinCompany={handleJoinCompany} />
       ) : (
@@ -586,6 +643,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           showHistory={historyOpen}
           onToggleHistory={handleToggleHistory}
           onManageAccess={authRequired ? handleManageAccess : undefined}
+          onManageBranding={canManageBranding ? handleOpenBranding : undefined}
         />
       )}
 
@@ -601,6 +659,22 @@ const handleJoinCompany = useCallback(async (companyCode) => {
       )}
 
       {accessCompany && <AccessManager clientId={accessCompany.id} businessName={accessCompany.name} onClose={() => setAccessCompany(null)} />}
+
+      {brandingOpen && brandingDraft && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="branding-title" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 text-slate-950 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div><h2 id="branding-title" className="text-xl font-extrabold">Identidad visual</h2><p className="mt-1 text-sm text-slate-500">{selectedBusiness?.name}</p></div>
+              <button type="button" onClick={() => setBrandingOpen(false)} aria-label="Cerrar">×</button>
+            </div>
+            <BrandingEditor value={brandingDraft} onChange={setBrandingDraft} error={brandingError} onError={setBrandingError} />
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" onClick={() => setBrandingOpen(false)} className="rounded-lg border px-4 py-2 font-bold">Cancelar</button>
+              <button type="button" onClick={handleSaveBranding} className={`rounded-lg px-4 py-2 font-bold ${theme.accent}`}>Guardar cambios</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {drawerOpen && selectedBusiness && (
         <ProductDrawer
