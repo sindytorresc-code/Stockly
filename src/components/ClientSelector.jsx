@@ -5,6 +5,7 @@ import { businesses } from "../data/businesses.js";
 import { iconMap } from "../lib/icons.js";
 import BrandingEditor from "./BrandingEditor.jsx";
 import { businessThemeStyle, isValidHexColor } from "../lib/businessTheme.js";
+import { completeCompanyJoin } from "../lib/companyJoin.js";
 
 export default function ClientSelector({
   onSelect,
@@ -57,7 +58,10 @@ export default function ClientSelector({
 
   async function submitJoin(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    // React clears currentTarget after the synchronous event handler returns.
+    // Keep the actual form element before awaiting the Supabase request.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const code = String(form.get("companyCode") || "").trim();
 
     if (!code) {
@@ -70,11 +74,14 @@ export default function ClientSelector({
     setSuccess("");
 
     try {
-      await onJoinCompany(code);
-      setSuccess("¡Te has unido a la empresa! Ya puedes seleccionarla.");
-      event.currentTarget.reset();
-    } catch (e) {
-      setError(e.message || "No fue posible unirse a la empresa.");
+      await completeCompanyJoin({
+        code,
+        form: formElement,
+        onJoinCompany,
+        onSuccess: () => setSuccess("¡Te has unido a la empresa! Ya puedes seleccionarla."),
+      });
+    } catch (error) {
+      setError(error.message || "No fue posible unirse a la empresa.");
     } finally {
       setSaving(false);
     }

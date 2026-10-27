@@ -291,8 +291,11 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     throw new Error("No se pudo conectar con Supabase.");
   }
 
-  await joinCompanyWithCode(companyCode);
-  await refreshAuthorizedBusinesses();
+  const joinedClientId = await joinCompanyWithCode(companyCode);
+  const refreshedBusinesses = await refreshAuthorizedBusinesses();
+  if (!refreshedBusinesses.some((business) => business.clientId === joinedClientId)) {
+    throw new Error("Supabase recibió la solicitud, pero no confirmó tu acceso a esa empresa. Inténtalo nuevamente.");
+  }
 }, [refreshAuthorizedBusinesses]);
 
   useEffect(() => {

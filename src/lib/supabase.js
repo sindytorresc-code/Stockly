@@ -142,9 +142,15 @@ export async function signUpWithPassword(email, password) {
 }
 
 export async function joinCompanyWithCode(companyCode) {
-  return supabaseRequest("/rpc/join_company_with_code", {
+  const clientId = await supabaseRequest("/rpc/join_company_with_code", {
     method: "POST", body: JSON.stringify({ access_code: normalizeCompanyAccessCode(companyCode) }),
   });
+  // The RPC returns the client UUID only after creating or confirming the
+  // caller's membership. A 2xx response without that value is not success.
+  if (typeof clientId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientId)) {
+    throw new Error("Supabase no confirmó la empresa asociada al código. Inténtalo nuevamente.");
+  }
+  return clientId;
 }
 export async function signInWithGoogle(companyCode = "") {
   const normalizedCode = String(companyCode || "").trim()
