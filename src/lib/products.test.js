@@ -323,86 +323,86 @@ describe("readExcelProducts", () => {
     return XLSX.write(workbook, { type: "array", bookType });
   }
 
-  it("reads Spanish inventory headers, maps columns, and skips invalid rows", () => {
+  it("reads Spanish inventory headers, maps columns, and skips invalid rows", async () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "Código", "Categoría", "Precio", "Precio de compra", "Existencias", "Stock mínimo", "Estado", "Marca", "Ubicación", "Campaña", "Comentarios"],
       ["Teclado", "TC-1", "Periféricos", 120, 80, 2, 1, "En stock", "Marca X", "Bodega", "", "Detalle"],
       ["Fila incompleta", "", "", -1, 1],
     ]]]);
-    expect(readExcelProducts(buffer, { businessId: "orus" }).products).toEqual([{
+    expect((await readExcelProducts(buffer, { businessId: "orus" })).products).toEqual([{
       name: "Teclado", code: "TC-1", category: "Periféricos", price: 120, stock: 2, tag: "En stock", comments: "Detalle",
       minStock: 1, purchasePrice: 80, brand: "Marca X", image: "", spot: "Bodega", campaign: "",
     }]);
   });
 
-  it("returns ATAIN asset workbooks to the campaign-aware CSV parser", () => {
+  it("returns ATAIN asset workbooks to the campaign-aware CSV parser", async () => {
     const buffer = workbookBuffer([["Activos", [["spot", "modelo", "serial", "hostname"], ["39", "Optiplex", "SER-1", "HOST-1"]]]]);
-    const result = readExcelProducts(buffer, { businessId: "atain" });
+    const result = await readExcelProducts(buffer, { businessId: "atain" });
     expect(result.atainText).toContain('"spot","modelo","serial","hostname"');
     expect(parseAtainImport(result.atainText, { campaign: "TRN1" }).products).toHaveLength(1);
   });
 
-  it("returns a manual mapping draft when headers are missing", () => {
+  it("returns a manual mapping draft when headers are missing", async () => {
     const buffer = workbookBuffer([["Sheet1", [["Producto", "Valor"], ["A", 2]]]]);
-    expect(readExcelProducts(buffer, { businessId: "orus" }).needsMapping).toBe(true);
+    expect((await readExcelProducts(buffer, { businessId: "orus" })).needsMapping).toBe(true);
   });
 
-  it("reads legacy XLS workbooks", () => {
+  it("reads legacy XLS workbooks", async () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "Codigo", "Categoria", "Precio", "Stock"],
       ["Mouse", "M-1", "Perifericos", 20, 4],
     ]]], "xls");
-    expect(readExcelProducts(buffer, { businessId: "orus" }).products[0].code).toBe("M-1");
+    expect((await readExcelProducts(buffer, { businessId: "orus" })).products[0].code).toBe("M-1");
   });
 
-  it("reads the SpreadsheetML XLS format used by Stockly exports", () => {
+  it("reads the SpreadsheetML XLS format used by Stockly exports", async () => {
     const xml = '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inventario"><Table><Row><Cell><Data ss:Type="String">Nombre</Data></Cell><Cell><Data ss:Type="String">Código</Data></Cell><Cell><Data ss:Type="String">Categoría</Data></Cell><Cell><Data ss:Type="String">Precio</Data></Cell><Cell><Data ss:Type="String">Stock</Data></Cell></Row><Row><Cell><Data ss:Type="String">Item</Data></Cell><Cell><Data ss:Type="String">I-XML</Data></Cell><Cell><Data ss:Type="String">General</Data></Cell><Cell><Data ss:Type="Number">20</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell></Row></Table></Worksheet></Workbook>';
     const buffer = new TextEncoder().encode(xml).buffer;
-    expect(prepareProductImport(buffer, { fileName: "stockly.xls" }).headerDetected).toBe(true);
+    expect((await prepareProductImport(buffer, { fileName: "stockly.xls" })).headerDetected).toBe(true);
   });
 
-  it("detects headers after title rows and ignores accents and extra spaces", () => {
+  it("detects headers after title rows and ignores accents and extra spaces", async () => {
     const buffer = workbookBuffer([["Datos", [
       ["Reporte de inventario"],
       ["  Nombre   del producto ", " referencia ", "Precio", " Costo ", "Cantidad", "Stock minimo", "Categoria", "Marca"],
       ["Bolso", "B-1", 125000, 70000, 3, 1, "Accesorios", "Marca A"],
     ]]]);
-    const draft = prepareProductImport(buffer, { fileName: "reporte.xlsx" });
+    const draft = await prepareProductImport(buffer, { fileName: "reporte.xlsx" });
     expect(draft.headerDetected).toBe(true);
     expect(draft.headerRow).toBe(1);
     expect(parseMappedProductImport(draft, draft.mapping).products[0]).toMatchObject({ name: "Bolso", code: "B-1", price: 125000, purchasePrice: 70000, stock: 3, minStock: 1, category: "Accesorios", brand: "Marca A" });
   });
 
-  it("lets the user map headerless columns without assuming name and code positions", () => {
+  it("lets the user map headerless columns without assuming name and code positions", async () => {
     const buffer = workbookBuffer([["Sheet1", [
       ["C-9", "Jarron", 45, 2, "Hogar"],
       ["C-10", "Taza", 12, 8, "Cocina"],
     ]]]);
-    const draft = prepareProductImport(buffer, { fileName: "sin-encabezados.xlsx" });
+    const draft = await prepareProductImport(buffer, { fileName: "sin-encabezados.xlsx" });
     expect(draft.headerDetected).toBe(false);
     expect(draft.mapping).toEqual({});
     const result = parseMappedProductImport(draft, { code: 0, name: 1, price: 2, stock: 3, category: 4 });
     expect(result.products.map((product) => product.name)).toEqual(["Jarron", "Taza"]);
   });
 
-  it("allows skipping a title row when a headerless table starts later", () => {
+  it("allows skipping a title row when a headerless table starts later", async () => {
     const buffer = workbookBuffer([["Sheet1", [
       ["Reporte generado por proveedor"],
       ["C-1", "Silla", 45, 2, "Hogar"],
     ]]]);
-    const draft = { ...prepareProductImport(buffer), startIndex: 1 };
+    const draft = { ...(await prepareProductImport(buffer)), startIndex: 1 };
     const result = parseMappedProductImport(draft, { code: 0, name: 1, price: 2, stock: 3, category: 4 });
     expect(result.products).toHaveLength(1);
     expect(result.issues).toHaveLength(0);
   });
 
-  it("accepts CSV through the same preview and mapping flow", () => {
-    const draft = prepareProductImport("Producto,Referencia,Precio,Cantidad,Categoria\nLuz,L-1,19,4,Hogar", { fileName: "stock.csv" });
+  it("accepts CSV through the same preview and mapping flow", async () => {
+    const draft = await prepareProductImport("Producto,Referencia,Precio,Cantidad,Categoria\nLuz,L-1,19,4,Hogar", { fileName: "stock.csv" });
     expect(draft.headerDetected).toBe(true);
     expect(parseMappedProductImport(draft, draft.mapping).products[0].code).toBe("L-1");
   });
 
-  it("parses Colombian peso prices from Excel and CSV without confusing thousands and decimals", () => {
+  it("parses Colombian peso prices from Excel and CSV without confusing thousands and decimals", async () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "Código", "Categoría", "Precio", "Stock"],
       ["Numérico Excel", "P-1", "General", 1099990, 1],
@@ -412,19 +412,19 @@ describe("readExcelProducts", () => {
       ["Formato anglosajón", "P-5", "General", "$2,499,000.00", 1],
       ["Código COP", "P-6", "General", "COP 150.000", 1],
     ]]]);
-    const excelResult = readExcelProducts(buffer);
+    const excelResult = await readExcelProducts(buffer);
     expect(excelResult.issues).toEqual([]);
     expect(excelResult.products.map((product) => product.price)).toEqual([
       1099990, 1099990, 209000, 1099990.5, 2499000, 150000,
     ]);
 
     const csv = "Nombre,Código,Categoría,Precio,Stock\nProducto CSV,C-1,General,$1.099.990,1";
-    const csvResult = readExcelProducts(csv, { fileName: "precios.csv" });
+    const csvResult = await readExcelProducts(csv, { fileName: "precios.csv" });
     expect(csvResult.issues).toEqual([]);
     expect(csvResult.products[0].price).toBe(1099990);
   });
 
-  it("keeps rejecting blank, nonnumeric, malformed, and negative sale prices", () => {
+  it("keeps rejecting blank, nonnumeric, malformed, and negative sale prices", async () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "Código", "Categoría", "Precio", "Stock"],
       ["Vacío", "P-1", "General", "", 1],
@@ -432,20 +432,20 @@ describe("readExcelProducts", () => {
       ["Miles mal agrupados", "P-3", "General", "1.09.990", 1],
       ["Negativo", "P-4", "General", "$-1.099.990", 1],
     ]]]);
-    const result = readExcelProducts(buffer);
+    const result = await readExcelProducts(buffer);
     expect(result.products).toEqual([]);
     expect(result.issues).toHaveLength(4);
     expect(result.issues.every((issue) => issue.message.includes("precio de venta inválido"))).toBe(true);
   });
 
-  it("defaults absent optional columns and reports invalid or blank rows", () => {
+  it("defaults absent optional columns and reports invalid or blank rows", async () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "SKU", "Precio", "Stock", "Categoría"],
       ["Libro", "L-1", 20, 3, "Lectura"],
       ["Error", "L-2", "no-numero", -1, ""],
       ["", "", "", "", ""],
     ]]]);
-    const draft = prepareProductImport(buffer);
+    const draft = await prepareProductImport(buffer);
     const result = parseMappedProductImport(draft, draft.mapping);
     expect(result.products[0]).toMatchObject({ purchasePrice: 0, minStock: 3, brand: "" });
     expect(result.products).toHaveLength(1);
@@ -454,25 +454,25 @@ describe("readExcelProducts", () => {
     expect(result.issues[1].message).toContain("Fila vacia");
   });
 
-  it("flags repeated codes in one file instead of importing duplicate rows", () => {
+  it("flags repeated codes in one file instead of importing duplicate rows", async () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "Código", "Precio", "Stock", "Categoría"],
       ["Uno", "D-1", 10, 1, "General"],
       ["Dos", "D-1", 12, 2, "General"],
     ]]]);
-    const draft = prepareProductImport(buffer);
+    const draft = await prepareProductImport(buffer);
     const result = parseMappedProductImport(draft, draft.mapping);
     expect(result.products).toHaveLength(1);
     expect(result.issues[0].message).toContain("código repetido");
   });
 
-  it("reports invalid workbook data clearly", () => {
-    expect(() => prepareProductImport(new Uint8Array([0, 1, 2, 3]))).toThrow(/No pude leer el archivo/);
+  it("reports invalid workbook data clearly", async () => {
+    await expect(prepareProductImport(new Uint8Array([0, 1, 2, 3]))).rejects.toThrow(/No pude leer el archivo/);
   });
 
-  it.each(["orus", "atain", "mara", "vogue", "sabor"])("maps the shared format for %s", (businessId) => {
+  it.each(["orus", "atain", "mara", "vogue", "sabor"])("maps the shared format for %s", async (businessId) => {
     const buffer = workbookBuffer([["Inventario", [["Nombre", "Código", "Precio", "Stock", "Categoría"], ["Item", "I-1", 50, 2, "General"]]]]);
-    const draft = prepareProductImport(buffer, { businessId });
+    const draft = await prepareProductImport(buffer, { businessId });
     expect(parseMappedProductImport(draft, draft.mapping).products[0].code).toBe("I-1");
   });
 });

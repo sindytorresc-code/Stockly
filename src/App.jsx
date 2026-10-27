@@ -32,7 +32,6 @@ import { businessThemeStyle, genericBusinessTheme, resolveBusinessTheme } from "
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
 import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseBackupRows, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
-import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
 import CompanyAccessCodesManager from "./components/CompanyAccessCodesManager.jsx";
@@ -359,6 +358,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
         showToast(`No hay datos de inventario para respaldar en ${selectedBusiness.name}.`);
         return;
       }
+      const { exportBusinessWorkbook } = await import("./lib/exportWorkbook.js");
       exportBusinessWorkbook(selectedBusiness, { products: allProducts, categories, movements, inventoryItems, assignments });
       showToast(`Respaldo descargado: ${allProducts.length} productos, ${categories.length} categorías, ${inventoryItems.length} ubicaciones, ${assignments.length} asignaciones y ${movements.length} movimientos.`);
     } catch (error) {
@@ -634,7 +634,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           showToast("El archivo esta vacio");
           return;
         }
-        const draft = prepareProductImport(content, { fileName: file.name, businessId: selectedBusiness.id });
+        const draft = await prepareProductImport(content, { fileName: file.name, businessId: selectedBusiness.id });
         if (draft.atainText && isAtainAssetCsv(draft.atainText)) {
           setAtainImportDraft({ text: draft.atainText, fileName: file.name });
         } else {

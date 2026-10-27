@@ -1,8 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
-import { createBusinessWorkbook } from "./exportWorkbook.js";
+import { createBusinessWorkbook, exportBusinessWorkbook } from "./exportWorkbook.js";
 
 describe("createBusinessWorkbook", () => {
+  it("downloads a real XLSX when the export action is requested", () => {
+    const link = { click: vi.fn(), href: "", download: "" };
+    const createObjectURL = vi.fn(() => "blob:stockly-test");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("document", { createElement: vi.fn(() => link) });
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+
+    try {
+      const workbook = exportBusinessWorkbook({ name: "ORUS", clientId: "orus" }, {
+        products: [{ name: "Producto", code: "P-1", price: 100, stock: 1 }],
+      });
+
+      expect(workbook.Sheets.Productos).toBeDefined();
+      expect(link.download).toBe("ORUS-respaldo.xlsx");
+      expect(link.href).toBe("blob:stockly-test");
+      expect(link.click).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:stockly-test");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("creates a real XLSX with the full product schema and company scoped sheets", () => {
     const company = { name: "Mara Makeup", clientId: "company-mara", type: "Belleza", description: "Inventario" };
     const products = [

@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 export function lowStockLimit(product) {
   return Number(product.minStock ?? 3);
 }
@@ -258,7 +256,8 @@ function detectProductHeaders(rows) {
   return best;
 }
 
-export function prepareProductImport(input, { fileName = "", businessId = "" } = {}) {
+export async function prepareProductImport(input, { fileName = "", businessId = "" } = {}) {
+  const XLSX = await import("xlsx");
   let workbook;
   try {
     const type = typeof input === "string" ? "string" : "array";
@@ -408,8 +407,8 @@ export function parseMappedProductImport(draft, mapping) {
   return { products, issues, missingFields: [], mappingConflicts: [] };
 }
 
-export function readExcelProducts(input, options = {}) {
-  const draft = prepareProductImport(input, options);
+export async function readExcelProducts(input, options = {}) {
+  const draft = await prepareProductImport(input, options);
   if (draft.atainText) return draft;
   if (!draft.headerDetected) return { ...draft, needsMapping: true };
   return { ...parseMappedProductImport(draft, draft.mapping), draft };
