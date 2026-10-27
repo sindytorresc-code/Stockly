@@ -44,8 +44,8 @@ begin
   end if;
   insert into public.clients(slug,name,business_type,description)
     values(trim(company_slug),trim(company_name),trim(company_type),coalesce(trim(company_description),'')) returning * into created;
-  select id into admin_role from public.roles where name='admin' and system_role;
-  if admin_role is null then raise exception 'admin_role_not_configured'; end if;
+  select id into admin_role from public.roles where name='administrador' and system_role;
+  if admin_role is null then raise exception 'administrator_role_not_configured'; end if;
   insert into public.client_memberships(client_id,user_id,role_id) values(created.id,auth.uid(),admin_role);
   return created;
 end $$;
@@ -60,7 +60,7 @@ grant execute on function public.create_company(text,text,text,text) to authenti
 
 create or replace function private.join_company_with_code(raw_code text)
 returns uuid language plpgsql security definer set search_path = pg_catalog, public, extensions as $$
-declare caller_id uuid := auth.uid(); matched_client uuid; employee_role uuid; normalized_code text;
+declare caller_id uuid := auth.uid(); matched_client uuid; administrator_role uuid; employee_role uuid; assigned_role uuid; normalized_code text; has_active_membership boolean;
 begin
   if caller_id is null then raise exception 'authentication_required'; end if;
   normalized_code := upper(regexp_replace(coalesce(raw_code, ''), '\s', '', 'g'));
@@ -71,11 +71,19 @@ begin
       and c.active and c.deactivated_at is null
     for key share;
   if matched_client is null then raise exception 'invalid_company_access_code'; end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(matched_client::text, 0));
+  select id into administrator_role from public.roles where name='administrador' and system_role;
   select id into employee_role from public.roles where name='employee' and system_role;
+  if administrator_role is null then raise exception 'administrator_role_not_configured'; end if;
   if employee_role is null then raise exception 'employee_role_not_configured'; end if;
+  select exists(select 1 from public.client_memberships where client_id=matched_client and active)
+    into has_active_membership;
+  assigned_role := case when has_active_membership then employee_role else administrator_role end;
   insert into public.client_memberships(client_id,user_id,role_id,active)
-    values (matched_client,caller_id,employee_role,true)
-    on conflict (client_id,user_id) do nothing;
+    values (matched_client,caller_id,assigned_role,true)
+    on conflict (client_id,user_id) do update
+      set active=true,
+          role_id=case when public.client_memberships.active then public.client_memberships.role_id else excluded.role_id end;
   insert into public.user_profiles(user_id,display_name)
     values (caller_id,coalesce(auth.jwt()->'user_metadata'->>'full_name', auth.jwt()->'user_metadata'->>'name', ''))
     on conflict (user_id) do nothing;

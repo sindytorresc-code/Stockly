@@ -1,14 +1,21 @@
--- Idempotently gives canonical administrator role aliases the application's
--- administrator permissions. Memberships remain company-scoped and active
--- membership is still required by private.has_client_permission and RLS.
--- This does not change any RLS policy or grant access to non-members.
+-- Idempotently gives the canonical administrator role full permissions and
+-- the optional Encargado role the read/export permissions it needs. Active,
+-- company-scoped membership is still required by RLS.
 begin;
 
 insert into public.role_permissions(role_id, permission_id)
 select r.id, p.id
 from public.roles r
 cross join public.permissions p
-where lower(btrim(r.name)) in ('admin', 'administrator', 'administrador')
+where lower(btrim(r.name)) = 'administrador'
+on conflict (role_id, permission_id) do nothing;
+
+insert into public.role_permissions(role_id, permission_id)
+select r.id, p.id
+from public.roles r
+join public.permissions p
+  on p.code in ('company.read', 'inventory.read', 'movements.read', 'exports.create')
+where lower(btrim(r.name)) = 'encargado'
 on conflict (role_id, permission_id) do nothing;
 
 commit;

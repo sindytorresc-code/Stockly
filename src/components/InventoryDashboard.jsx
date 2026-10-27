@@ -114,9 +114,9 @@ export default function InventoryDashboard({
                 <Upload size={18} /> Cargar archivo
                 <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls" className="hidden" onChange={onImport} />
               </label>
-              <button type="button" onClick={onExport} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">
+              {onExport && <button type="button" onClick={onExport} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">
                 <FileDown size={18} /> Exportar Excel
-              </button>
+              </button>}
               <button type="button" onClick={onToggleHistory} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Historial</button>
               {onManageAccess && <button type="button" onClick={onManageAccess} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Usuarios y roles</button>}
               {onManageBranding && <button type="button" onClick={onManageBranding} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-4 font-bold">Personalizar marca</button>}

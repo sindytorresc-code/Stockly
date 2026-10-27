@@ -31,7 +31,7 @@ import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessThemeStyle, genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
+import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseCategories, fetchSupabaseClient, fetchSupabaseClients, fetchSupabaseMovements, fetchSupabaseProducts, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
@@ -84,6 +84,7 @@ export default function App() {
   const [brandingDraft, setBrandingDraft] = useState(null);
   const [brandingError, setBrandingError] = useState("");
   const [canManageBranding, setCanManageBranding] = useState(false);
+  const [canExport, setCanExport] = useState(!authRequired);
 
   useEffect(() => {
     if (!authRequired) return;
@@ -158,6 +159,19 @@ export default function App() {
     hasClientPermission(selectedBusiness.clientId, "company.manage")
       .then((allowed) => { if (!cancelled) setCanManageBranding(allowed); })
       .catch(() => { if (!cancelled) setCanManageBranding(false); });
+    return () => { cancelled = true; };
+  }, [authRequired, authenticated, selectedBusiness?.clientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCanExport(!authRequired);
+    if (!authRequired || !authenticated || !selectedBusiness?.clientId) return () => { cancelled = true; };
+    Promise.all([
+      hasClientPermission(selectedBusiness.clientId, "exports.create"),
+      hasClientPermission(selectedBusiness.clientId, "inventory.read"),
+    ]).then(([canCreateExport, canReadInventory]) => {
+      if (!cancelled) setCanExport(canCreateExport && canReadInventory);
+    }).catch(() => { if (!cancelled) setCanExport(false); });
     return () => { cancelled = true; };
   }, [authRequired, authenticated, selectedBusiness?.clientId]);
 
@@ -311,14 +325,32 @@ const handleJoinCompany = useCallback(async (companyCode) => {
   const handleExport = useCallback(async () => {
     if (!selectedBusiness) return;
     try {
-      const movements = await loadMovements(selectedBusiness);
-      exportBusinessWorkbook(selectedBusiness, products, movements);
-      showToast("Respaldo Excel descargado");
+      let allProducts = products;
+      let categories = [...new Set(products.map((product) => String(product.category || "").trim()).filter(Boolean))].map((name) => ({ name }));
+      let movements = authRequired ? null : await loadMovements(selectedBusiness);
+      if (authRequired) {
+        const clientId = selectedBusiness.clientId;
+        if (!clientId) throw new Error("No se encontró el ID de la empresa seleccionada.");
+        const [canCreateExport, canReadInventory, canReadMovements] = await Promise.all([
+          hasClientPermission(clientId, "exports.create"),
+          hasClientPermission(clientId, "inventory.read"),
+          hasClientPermission(clientId, "movements.read"),
+        ]);
+        if (!canCreateExport || !canReadInventory) throw new Error("Tu rol no tiene permiso para exportar el inventario de esta empresa.");
+        [allProducts, categories] = await Promise.all([fetchSupabaseProducts(clientId), fetchSupabaseCategories(clientId)]);
+        movements = canReadMovements ? await fetchSupabaseMovements(clientId) : null;
+      }
+      if (!allProducts.length) {
+        showToast(`No hay productos para exportar en ${selectedBusiness.name}.`);
+        return;
+      }
+      exportBusinessWorkbook(selectedBusiness, allProducts, movements, categories);
+      showToast(`Respaldo Excel de ${selectedBusiness.name} descargado (${allProducts.length} productos)`);
     } catch (error) {
       console.error(error);
-      showToast(formatSupabaseError(error, "No pude cargar los movimientos para el respaldo"));
+      showToast(formatSupabaseError(error, "No pude exportar el archivo Excel de esta empresa"));
     }
-  }, [selectedBusiness, products, loadMovements, showToast]);
+  }, [authRequired, selectedBusiness, products, loadMovements, showToast]);
 
   const handleToggleHistory = useCallback(async () => {
     if (historyOpen) { setHistoryOpen(false); return; }
@@ -665,7 +697,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           onImport={handleImportCsv}
           onChangePassword={authRequired ? undefined : () => setPasswordModalOpen(true)}
           onClearAll={() => setClearAllConfirmOpen(true)}
-          onExport={handleExport}
+          onExport={canExport ? handleExport : undefined}
           movements={historyRows}
           showHistory={historyOpen}
           onToggleHistory={handleToggleHistory}

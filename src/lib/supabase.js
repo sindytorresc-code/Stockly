@@ -8,6 +8,7 @@ import { normalizeCompanyAccessCode } from "./companyAccessCode.js";
 import { buildGoogleAuthorizeUrl } from "./googleOAuth.js";
 import { deactivateMembershipRequest, membershipGrantsPermission, membershipRevocationResult } from "./clientMembership.js";
 import { normalizeHexColor, validateBrandLogo } from "./businessTheme.js";
+import { selectableCompanyRoles } from "./roles.js";
 
 export { hasSupabaseConfig, initSupabase, isSupabaseConfigured };
 
@@ -414,9 +415,27 @@ export async function updateSupabasePin(slug, pin) {
 }
 
 export async function fetchSupabaseProducts(clientId) {
-  return supabaseRequest(
-    `/products?client_id=eq.${clientId}&select=*&order=created_at.desc`,
-  );
+  const result = [];
+  for (let offset = 0; ; offset += 1000) {
+    const page = await supabaseRequest(
+      `/products?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=created_at.desc`,
+      { headers: { Range: `${offset}-${offset + 999}` } },
+    );
+    result.push(...(page || []));
+    if (!page || page.length < 1000) return result;
+  }
+}
+
+export async function fetchSupabaseCategories(clientId) {
+  const result = [];
+  for (let offset = 0; ; offset += 1000) {
+    const page = await supabaseRequest(
+      `/categories?client_id=eq.${encodeURIComponent(clientId)}&select=id,client_id,name,description&order=name.asc`,
+      { headers: { Range: `${offset}-${offset + 999}` } },
+    );
+    result.push(...(page || []));
+    if (!page || page.length < 1000) return result;
+  }
 }
 
 export async function createSupabaseBusiness(business) {
@@ -469,7 +488,7 @@ export async function updateSupabaseBusinessBranding(clientId, { name, icon, the
 export async function fetchSupabaseMovements(clientId) {
   const result = [];
   for (let offset = 0; ; offset += 1000) {
-    const page = await supabaseRequest(`/inventory_movements?client_id=eq.${encodeURIComponent(clientId)}&select=created_at,movement_type,product_name,product_code,quantity,notes&order=created_at.desc`, {
+    const page = await supabaseRequest(`/inventory_movements?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=created_at.desc`, {
       headers: { Range: `${offset}-${offset + 999}` },
     });
     result.push(...(page || []));
@@ -482,7 +501,7 @@ export async function fetchAccessConfiguration(clientId) {
     supabaseRequest("/roles?select=id,name&order=name.asc"),
     supabaseRequest(`/client_memberships?client_id=eq.${encodeURIComponent(clientId)}&select=user_id,role_id,active&order=created_at.asc`),
   ]);
-  return { roles, memberships };
+  return { roles: selectableCompanyRoles(roles || []), memberships };
 }
 
 export async function saveClientMembership(clientId, userId, roleId) {

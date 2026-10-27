@@ -7,7 +7,7 @@ do $$
 declare user_one uuid; user_two uuid; company_one uuid; company_two uuid; employee_role uuid; company_admin uuid; admin_client uuid;
 begin
   select m.user_id,m.client_id into company_admin,admin_client from public.client_memberships m
-    join public.roles r on r.id=m.role_id where m.active and r.name='admin' order by m.created_at limit 1;
+    join public.roles r on r.id=m.role_id where m.active and r.name='administrador' order by m.created_at limit 1;
   select m.user_id into user_one from public.client_memberships m join public.roles r on r.id=m.role_id
     where m.active and r.name='employee' and m.user_id<>company_admin order by m.created_at,m.user_id limit 1;
   select m.user_id into user_two from public.client_memberships m join public.roles r on r.id=m.role_id
@@ -36,7 +36,7 @@ declare created public.clients; one_time_code text;
 begin
   created := public.create_company('stockly-security-probe-'||replace(gen_random_uuid()::text,'-',''),'Security test company','TEST','Rolled-back integration test');
   if not exists(select 1 from public.client_memberships m join public.roles r on r.id=m.role_id
-    where m.client_id=created.id and m.user_id=current_setting('stockly.test.company_admin')::uuid and r.name='admin' and m.active) then
+    where m.client_id=created.id and m.user_id=current_setting('stockly.test.company_admin')::uuid and r.name='administrador' and m.active) then
     raise exception 'company_creator_not_assigned_admin';
   end if;
   if not exists(select 1 from public.clients where id=created.id) then raise exception 'creator_cannot_read_created_company'; end if;
@@ -101,11 +101,11 @@ begin
     if sqlerrm='invalid_code_was_accepted' then raise; end if;
     if sqlerrm<>'invalid_company_access_code' then raise; end if;
   end;
-  update public.client_memberships set role_id=(select id from public.roles where name='admin')
+  update public.client_memberships set role_id=(select id from public.roles where name='administrador')
     where client_id=current_setting('stockly.test.company_one')::uuid
       and user_id=current_setting('stockly.test.user_one')::uuid;
   if exists(select 1 from public.client_memberships where client_id=current_setting('stockly.test.company_one')::uuid
-      and user_id=current_setting('stockly.test.user_one')::uuid and role_id=(select id from public.roles where name='admin')) then
+      and user_id=current_setting('stockly.test.user_one')::uuid and role_id=(select id from public.roles where name='administrador')) then
     raise exception 'employee_promoted_self_to_admin';
   end if;
   if public.join_company_with_code('ABCDEF0123456789ABCDEF0123456789')<>current_setting('stockly.test.created_company')::uuid then
