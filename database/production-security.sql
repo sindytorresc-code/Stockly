@@ -83,7 +83,8 @@ insert into permissions(code,description) values
  ('inventory.write','Editar inventario'),('movements.read','Consultar movimientos'),('users.manage','Administrar usuarios y roles'),('exports.create','Exportar información')
 on conflict(code) do nothing;
 insert into role_permissions(role_id,permission_id)
-select r.id,p.id from roles r cross join permissions p where r.name='admin' on conflict do nothing;
+select r.id,p.id from roles r cross join permissions p
+where lower(btrim(r.name)) in ('admin','administrator','administrador') on conflict do nothing;
 insert into role_permissions(role_id,permission_id)
 select r.id,p.id from roles r join permissions p on p.code in ('company.read','inventory.read','inventory.write','movements.read','exports.create') where r.name='manager' on conflict do nothing;
 insert into role_permissions(role_id,permission_id)
