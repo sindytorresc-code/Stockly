@@ -6,6 +6,16 @@
 
 @layer base {
   :root {
+    --stockly-bg: #f5f7fa;
+    --stockly-surface: #ffffff;
+    --stockly-ink: #172033;
+    --stockly-muted: #64748b;
+    --stockly-border: #e2e8f0;
+    --stockly-brand: #00b4d8;
+    --stockly-brand-ink: #0b0c10;
+    --stockly-selected: #0b0c10;
+    --stockly-success: #16a34a;
+    --stockly-error: #dc2626;
     font-family: Inter, system-ui, sans-serif;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -32,12 +42,13 @@
   }
 
   :focus-visible {
-    outline: 3px solid var(--brand-accent, #64748b);
+    outline: 3px solid var(--stockly-brand);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: var(--brand-soft, #e2e8f0);
+    color: var(--stockly-ink);
+    background: color-mix(in srgb, var(--stockly-brand) 24%, white);
   }
 }
 
@@ -48,5 +59,14 @@
 
   .interactive-control {
     @apply transition-colors duration-150 focus-visible:outline-none;
+  }
+
+  .stockly-primary {
+    color: var(--stockly-brand-ink);
+    background: var(--stockly-brand);
+  }
+
+  .stockly-primary:hover {
+    background: color-mix(in srgb, var(--stockly-brand) 88%, white);
   }
 }

@@ -18,11 +18,22 @@ describe("selector de empresas autorizadas", () => {
     const html = renderToStaticMarkup(<ClientSelector businesses={[authorizedBusiness]} onSelect={() => {}} />);
     expect(html).toContain("Mara Makeup");
     expect(html).toContain(authorizedBusiness.description);
+    expect(html).toContain("Selecciona una empresa");
+    expect(html).toContain("Abrir empresa");
+    expect(html).not.toContain("bg-gradient-to-br");
   });
 
   it("no muestra empresas que Supabase no devolvió como accesibles", () => {
     const html = renderToStaticMarkup(<ClientSelector businesses={[]} onSelect={() => {}} />);
     expect(html).not.toContain("Mara Makeup");
     expect(html).not.toContain("Empresa sin membresía");
+  });
+
+  it("conserva las acciones de cerrar sesión y administrar códigos cuando están autorizadas", () => {
+    const html = renderToStaticMarkup(
+      <ClientSelector businesses={[]} onSelect={() => {}} onSignOut={() => {}} onManageAccessCodes={() => {}} />,
+    );
+    expect(html).toContain("Cerrar sesión");
+    expect(html).toContain("Administrar llaves de acceso");
   });
 });

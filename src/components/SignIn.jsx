@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Boxes, Plus, X } from "lucide-react";
 import {
   signInWithGoogle,
   signInWithPassword,
@@ -99,47 +99,56 @@ export default function SignIn({
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-100 p-4">
+    <main className="grid min-h-screen place-items-center bg-[var(--stockly-bg)] px-4 py-10 text-[var(--stockly-ink)] sm:px-6">
       <section className="w-full max-w-md">
         <form
           onSubmit={submit}
-          className="w-full rounded-xl bg-white p-8 text-slate-950 shadow-xl"
+          className="w-full rounded-2xl border border-[var(--stockly-border)] bg-[var(--stockly-surface)] p-6 shadow-sm sm:p-8"
         >
-          <h1 className="text-3xl font-extrabold">Stockly</h1>
+          <div className="mb-6 flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-xl bg-[var(--stockly-selected)] text-[var(--stockly-brand)]"><Boxes size={23} aria-hidden="true" /></span>
+            <span>
+              <span className="block text-xs font-bold uppercase tracking-[0.16em] text-[var(--stockly-muted)]">Inventarios empresariales</span>
+              <span className="block text-2xl font-bold tracking-tight">Stockly</span>
+            </span>
+          </div>
 
-          <p className="mb-6 mt-2 text-slate-500">
+          <h1 className="text-xl font-semibold tracking-tight">
             {registering
-              ? "Crea tu cuenta personal para comenzar."
-              : "Inicia sesión para acceder a tus empresas."}
+              ? "Crea tu cuenta personal"
+              : "Inicia sesión"}
+          </h1>
+          <p className="mb-6 mt-2 text-sm leading-6 text-[var(--stockly-muted)]">
+            {registering ? "Regístrate para comenzar a gestionar tus empresas." : "Accede de forma segura a tus empresas e inventarios."}
           </p>
 
           <button
             type="button"
             disabled={busy}
             onClick={submitGoogle}
-            className="mb-5 h-11 w-full rounded-lg border border-slate-300 font-bold text-slate-800 disabled:opacity-60"
+            className="mb-5 h-11 w-full rounded-xl border border-[var(--stockly-border)] bg-white font-semibold text-[var(--stockly-ink)] transition hover:bg-slate-50 disabled:opacity-60"
           >
             {busy ? "Conectando…" : "Continuar con Google"}
           </button>
 
-          <div className="mb-5 flex items-center gap-3 text-xs text-slate-400">
-            <span className="h-px flex-1 bg-slate-200" />
+          <div className="mb-5 flex items-center gap-3 text-xs text-[var(--stockly-muted)]">
+            <span className="h-px flex-1 bg-[var(--stockly-border)]" />
             o con correo y contraseña
-            <span className="h-px flex-1 bg-slate-200" />
+            <span className="h-px flex-1 bg-[var(--stockly-border)]" />
           </div>
 
-          <label className="mb-4 block text-sm font-bold">
+          <label className="mb-4 block text-sm font-semibold text-[var(--stockly-ink)]">
             Correo
             <input
               name="email"
               type="email"
               required
               autoComplete="email"
-              className="mt-1 h-11 w-full rounded-lg border px-3"
+              className="mt-1 h-11 w-full rounded-xl border border-[var(--stockly-border)] bg-white px-3 text-[var(--stockly-ink)] outline-none transition placeholder:text-slate-400 focus:border-[var(--stockly-brand)] focus:ring-2 focus:ring-cyan-100"
             />
           </label>
 
-          <label className="mb-5 block text-sm font-bold">
+          <label className="mb-5 block text-sm font-semibold text-[var(--stockly-ink)]">
             Contraseña
             <input
               name="password"
@@ -147,7 +156,7 @@ export default function SignIn({
               required
               minLength={6}
               autoComplete={registering ? "new-password" : "current-password"}
-              className="mt-1 h-11 w-full rounded-lg border px-3"
+              className="mt-1 h-11 w-full rounded-xl border border-[var(--stockly-border)] bg-white px-3 text-[var(--stockly-ink)] outline-none transition placeholder:text-slate-400 focus:border-[var(--stockly-brand)] focus:ring-2 focus:ring-cyan-100"
             />
           </label>
 
@@ -165,7 +174,7 @@ export default function SignIn({
 
           <button
             disabled={busy}
-            className="h-11 w-full rounded-lg bg-blue-700 font-bold text-white disabled:opacity-60"
+            className="stockly-primary h-11 w-full rounded-xl font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy
               ? "Procesando…"
@@ -182,7 +191,7 @@ export default function SignIn({
               setError("");
               setMessage("");
             }}
-            className="mt-4 w-full text-sm font-semibold text-blue-700 hover:underline"
+            className="mt-4 min-h-11 w-full text-sm font-semibold text-slate-600 transition hover:text-[var(--stockly-ink)] hover:underline"
           >
             {registering
               ? "Ya tengo una cuenta. Iniciar sesión"
@@ -190,8 +199,8 @@ export default function SignIn({
           </button>
         </form>
 
-        <div className="mt-5 rounded-xl bg-white/80 p-5 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-600">
+        <div className="mt-4 rounded-2xl border border-[var(--stockly-border)] bg-white p-5 text-center shadow-sm">
+          <p className="text-sm font-semibold text-[var(--stockly-muted)]">
             ¿Tu empresa aún no está registrada?
           </p>
 
@@ -202,7 +211,7 @@ export default function SignIn({
               setCreatingCompany(true);
                 setCompanyBrand({ brandColor: "#4f46e5", icon: "package", logoDataUrl: "" });
             }}
-            className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-5 font-bold text-slate-700 transition hover:border-blue-500 hover:text-blue-700"
+            className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--stockly-border)] px-5 font-semibold text-[var(--stockly-ink)] transition hover:border-[var(--stockly-brand)] hover:bg-cyan-50"
           >
             <Plus size={18} /> Agregar empresa
           </button>
@@ -213,7 +222,7 @@ export default function SignIn({
             <form
               onSubmit={submitCompany}
               aria-label="Registrar empresa"
-              className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 text-slate-950 shadow-2xl"
+            className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--stockly-border)] bg-white p-5 text-[var(--stockly-ink)] shadow-2xl sm:p-7"
             >
               <div className="mb-5 flex items-center justify-between">
                 <div>
@@ -233,33 +242,33 @@ export default function SignIn({
                 </button>
               </div>
 
-              <label className="mb-3 block text-sm font-bold">
+              <label className="mb-3 block text-sm font-semibold">
                 Nombre de la empresa
                 <input
                   name="companyName"
                   required
                   maxLength={80}
                   autoComplete="organization"
-                  className="mt-1 h-11 w-full rounded-lg border px-3"
+                  className="mt-1 h-11 w-full rounded-xl border border-[var(--stockly-border)] bg-white px-3 outline-none focus:border-[var(--stockly-brand)] focus:ring-2 focus:ring-cyan-100"
                 />
               </label>
 
-              <label className="mb-3 block text-sm font-bold">
+              <label className="mb-3 block text-sm font-semibold">
                 Tipo de negocio
                 <input
                   name="companyType"
                   required
                   maxLength={60}
-                  className="mt-1 h-11 w-full rounded-lg border px-3"
+                  className="mt-1 h-11 w-full rounded-xl border border-[var(--stockly-border)] bg-white px-3 outline-none focus:border-[var(--stockly-brand)] focus:ring-2 focus:ring-cyan-100"
                 />
               </label>
 
-              <label className="mb-4 block text-sm font-bold">
+              <label className="mb-4 block text-sm font-semibold">
                 Descripción
                 <input
                   name="companyDescription"
                   maxLength={200}
-                  className="mt-1 h-11 w-full rounded-lg border px-3"
+                  className="mt-1 h-11 w-full rounded-xl border border-[var(--stockly-border)] bg-white px-3 outline-none focus:border-[var(--stockly-brand)] focus:ring-2 focus:ring-cyan-100"
                 />
               </label>
 
@@ -278,7 +287,7 @@ export default function SignIn({
 
               <button
                 disabled={busy}
-                className="h-11 w-full rounded-lg bg-blue-700 font-bold text-white disabled:opacity-60"
+                className="stockly-primary h-11 w-full rounded-xl font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busy ? "Conectando con Google…" : "Continuar con Google y guardar"}
               </button>
