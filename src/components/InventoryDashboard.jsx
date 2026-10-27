@@ -75,6 +75,10 @@ export default function InventoryDashboard({
   const Icon = iconMap[business.icon] || iconMap.package;
   const sourceText = `${dataSource}${isLoadingProducts ? " sincronizando..." : ""}`;
   const isAtain = business.id === "atain";
+  const headerSurface = theme.mode === "dark"
+    ? "bg-slate-900 border-slate-800"
+    : "bg-white border-slate-200";
+  const actionSurface = theme.mode === "dark" ? theme.panelSoft : theme.panel;
   const filterOptions = isAtain
     ? ATAIN_ASSET_FILTERS
     : [
@@ -91,7 +95,7 @@ export default function InventoryDashboard({
 
   return (
     <>
-      <header className={`relative overflow-hidden border-b border-slate-200 bg-white px-4 py-4 shadow-sm ${theme.text}`}>
+      <header className={`relative overflow-hidden border-b px-4 py-4 shadow-sm ${headerSurface} ${theme.text}`}>
         <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${theme.accent}`} />
         <div className="mx-auto max-w-[1440px]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -113,21 +117,21 @@ export default function InventoryDashboard({
                 <span className="block truncate text-2xl font-bold tracking-tight sm:text-3xl">{business.name}</span>
               </span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <label className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold ${theme.panel} ${theme.text} transition hover:opacity-80`}>
+            <div className="flex flex-wrap gap-3">
+              <label className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>
                 <Upload size={18} /> Cargar archivo
                 <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls" className="hidden" onChange={onImport} />
               </label>
-              {onExport && <button type="button" onClick={onExport} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold ${theme.panel} ${theme.text} transition hover:opacity-80`}>
+              {onExport && <button type="button" onClick={onExport} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>
                 <FileDown size={18} /> Exportar Excel
               </button>}
-              <button type="button" onClick={onToggleHistory} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold ${theme.panel} ${theme.text} transition hover:opacity-80`}>Historial</button>
-              {onManageAccess && <button type="button" onClick={onManageAccess} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold ${theme.panel} ${theme.text} transition hover:opacity-80`}>Usuarios y roles</button>}
-              {onManageBranding && <button type="button" onClick={onManageBranding} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold ${theme.panel} ${theme.text} transition hover:opacity-80`}>Personalizar marca</button>}
+              <button type="button" onClick={onToggleHistory} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Historial</button>
+              {onManageAccess && <button type="button" onClick={onManageAccess} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Usuarios y roles</button>}
+              {onManageBranding && <button type="button" onClick={onManageBranding} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Personalizar marca</button>}
               {onChangePassword && <button
                 type="button"
                 onClick={onChangePassword}
-                className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-semibold ${theme.panel} ${theme.text} transition hover:opacity-80`}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}
               >
                 Cambiar clave
               </button>}
