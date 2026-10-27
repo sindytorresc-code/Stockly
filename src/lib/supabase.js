@@ -356,7 +356,7 @@ export async function fetchSupabaseClient(slug) {
 }
 
 export async function fetchSupabaseClients() {
-  return supabaseRequest("/clients?select=id,slug,name,business_type,description,icon,theme&order=name.asc");
+  return supabaseRequest("/clients?select=id,slug,name,business_type,description,icon,theme,created_at&order=name.asc");
 }
 
 export async function ensureSupabaseClient(business) {
@@ -436,6 +436,70 @@ export async function fetchSupabaseCategories(clientId) {
     result.push(...(page || []));
     if (!page || page.length < 1000) return result;
   }
+}
+
+const backupTableOrder = Object.freeze({
+  products: "id.asc",
+  categories: "id.asc",
+  inventory_movements: "id.asc",
+  inventory_items: "id.asc",
+  item_assignments: "id.asc",
+});
+
+async function supabaseRequestPage(path, offset, limit) {
+  const config = await requireSupabaseConfig();
+  if (accessToken && !(await ensureFreshSession())) throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
+  const response = await fetch(`${config.url}/rest/v1${path}`, {
+    cache: "no-store",
+    headers: {
+      apikey: config.key,
+      Authorization: `Bearer ${accessToken || config.key}`,
+      "Content-Type": "application/json",
+      "Range-Unit": "items",
+      Range: `${offset}-${offset + limit - 1}`,
+      Prefer: "count=exact",
+    },
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(details || response.statusText);
+  }
+  const contentRange = response.headers.get("content-range") || "";
+  const totalMatch = contentRange.match(/\/(\d+|\*)$/);
+  if (!totalMatch || totalMatch[1] === "*") {
+    throw new Error(`Supabase no confirmó el total de registros de ${path.split("?")[0]}; no se generó un respaldo incompleto.`);
+  }
+  return { rows: await response.json(), total: Number(totalMatch[1]) };
+}
+
+// The whitelist keeps table identifiers out of caller input. Exact counts on
+// every range let the backup abort instead of silently producing a partial file.
+export async function fetchSupabaseBackupRows(table, clientId) {
+  const order = backupTableOrder[table];
+  if (!order) throw new Error("La tabla solicitada no forma parte del respaldo de inventario.");
+  if (!clientId) throw new Error("No se encontró el ID de la empresa para el respaldo.");
+  const rows = [];
+  const pageSize = 1000;
+  let total = null;
+  for (let offset = 0; total === null || offset < total; offset += pageSize) {
+    const page = await supabaseRequestPage(
+      `/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=${order}`,
+      offset,
+      pageSize,
+    );
+    if (total !== null && page.total !== total) {
+      throw new Error("Los registros cambiaron durante la exportación. Vuelve a generar el respaldo para obtener datos consistentes.");
+    }
+    total = page.total;
+    rows.push(...(page.rows || []));
+    if ((page.rows || []).length < pageSize && rows.length < total) {
+      throw new Error("Supabase devolvió una página incompleta. No se generó un respaldo parcial.");
+    }
+  }
+  if (rows.length !== total) {
+    throw new Error(`El respaldo quedó incompleto: Supabase reportó ${total} filas de ${table} y se recibieron ${rows.length}.`);
+  }
+  return { rows, total };
 }
 
 export async function createSupabaseBusiness(business) {

@@ -16,7 +16,7 @@ describe("createBusinessWorkbook", () => {
     });
     const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
     const reopened = XLSX.read(bytes, { type: "array" });
-    expect(reopened.SheetNames).toEqual(["Resumen", "Productos", "Categorías", "Movimientos"]);
+    expect(reopened.SheetNames).toEqual(["Resumen", "Productos", "Categorías", "Ubicaciones", "Asignaciones", "Movimientos"]);
     const rows = XLSX.utils.sheet_to_json(reopened.Sheets.Productos, { header: 1 });
     expect(rows).toHaveLength(3);
     expect(rows[0]).toContain("Precio de compra");
@@ -30,7 +30,7 @@ describe("createBusinessWorkbook", () => {
   it("omits movements if the active role does not have permission", () => {
     const workbook = createBusinessWorkbook({ name: "ORUS", clientId: "orus" }, [{ name: "Item", stock: 1 }], { movements: null });
     expect(workbook.SheetNames).not.toContain("Movimientos");
-    expect(workbook.Sheets.Resumen.B11.v).toBe("Sin permiso de lectura");
+    expect(workbook.Sheets.Resumen.B15.v).toBe("Sin permiso de lectura");
   });
 
   it("keeps the export scoped to any of Stockly's five companies", () => {
@@ -44,5 +44,20 @@ describe("createBusinessWorkbook", () => {
       expect(productRows[1][1]).toBe(clientId);
       expect(workbook.Sheets.Resumen.B3.v).toBe(clientId);
     }
+  });
+
+  it("preserves every row when a company has thousands of products and movements", () => {
+    const products = Array.from({ length: 1257 }, (_, index) => ({
+      id: `p-${index}`, client_id: "large-company", name: `Product ${index}`, code: `SKU-${index}`, stock: 1,
+    }));
+    const movements = Array.from({ length: 2249 }, (_, index) => ({
+      id: `m-${index}`, client_id: "large-company", product_id: `p-${index % products.length}`,
+      movement_type: "adjustment", product_name: `Product ${index}`, product_code: `SKU-${index}`,
+    }));
+    const workbook = createBusinessWorkbook({ name: "Large shop", clientId: "large-company" }, products, { movements });
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Productos, { header: 1 })).toHaveLength(1258);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets.Movimientos, { header: 1 })).toHaveLength(2250);
+    expect(workbook.Sheets.Resumen.B11.v).toBe(1257);
+    expect(workbook.Sheets.Resumen.B15.v).toBe(2249);
   });
 });

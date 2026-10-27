@@ -31,7 +31,7 @@ import { formatSupabaseError } from "./lib/supabaseErrors.js";
 import { businessThemeStyle, genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
-import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseCategories, fetchSupabaseClient, fetchSupabaseClients, fetchSupabaseMovements, fetchSupabaseProducts, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
+import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseBackupRows, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
 import { exportBusinessWorkbook } from "./lib/exportWorkbook.js";
 import SignIn from "./components/SignIn.jsx";
 import AccessManager from "./components/AccessManager.jsx";
@@ -135,8 +135,8 @@ export default function App() {
       const existing = initialBusinesses.find((item) => item.id === row.slug);
       const defaultTheme = existing?.theme || themeForBusinessType(row.business_type, initialBusinesses, genericBusinessTheme);
       const businessTheme = resolveBusinessTheme(defaultTheme, row.theme);
-      return existing ? { ...existing, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || existing.icon, cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme, brandConfig: row.theme || {} } : {
-        id: row.slug, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package",
+      return existing ? { ...existing, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || existing.icon, createdAt: row.created_at, cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme, brandConfig: row.theme || {} } : {
+        id: row.slug, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package", createdAt: row.created_at,
         cardGradient: businessTheme.header || genericBusinessTheme.header, pin: "", products: [], theme: businessTheme, brandConfig: row.theme || {},
       };
     });
@@ -169,8 +169,9 @@ export default function App() {
     Promise.all([
       hasClientPermission(selectedBusiness.clientId, "exports.create"),
       hasClientPermission(selectedBusiness.clientId, "inventory.read"),
-    ]).then(([canCreateExport, canReadInventory]) => {
-      if (!cancelled) setCanExport(canCreateExport && canReadInventory);
+      hasClientPermission(selectedBusiness.clientId, "movements.read"),
+    ]).then(([canCreateExport, canReadInventory, canReadMovements]) => {
+      if (!cancelled) setCanExport(canCreateExport && canReadInventory && canReadMovements);
     }).catch(() => { if (!cancelled) setCanExport(false); });
     return () => { cancelled = true; };
   }, [authRequired, authenticated, selectedBusiness?.clientId]);
@@ -327,7 +328,9 @@ const handleJoinCompany = useCallback(async (companyCode) => {
     try {
       let allProducts = products;
       let categories = [...new Set(products.map((product) => String(product.category || "").trim()).filter(Boolean))].map((name) => ({ name }));
-      let movements = authRequired ? null : await loadMovements(selectedBusiness);
+      let movements = authRequired ? [] : await loadMovements(selectedBusiness);
+      let inventoryItems = [];
+      let assignments = [];
       if (authRequired) {
         const clientId = selectedBusiness.clientId;
         if (!clientId) throw new Error("No se encontró el ID de la empresa seleccionada.");
@@ -336,16 +339,28 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           hasClientPermission(clientId, "inventory.read"),
           hasClientPermission(clientId, "movements.read"),
         ]);
-        if (!canCreateExport || !canReadInventory) throw new Error("Tu rol no tiene permiso para exportar el inventario de esta empresa.");
-        [allProducts, categories] = await Promise.all([fetchSupabaseProducts(clientId), fetchSupabaseCategories(clientId)]);
-        movements = canReadMovements ? await fetchSupabaseMovements(clientId) : null;
+        if (!canCreateExport || !canReadInventory || !canReadMovements) {
+          throw new Error("Para crear un respaldo completo necesitas los permisos de exportación, lectura del inventario y lectura de movimientos de esta empresa.");
+        }
+        const [productData, categoryData, movementData, inventoryItemData, assignmentData] = await Promise.all([
+          fetchSupabaseBackupRows("products", clientId),
+          fetchSupabaseBackupRows("categories", clientId),
+          fetchSupabaseBackupRows("inventory_movements", clientId),
+          fetchSupabaseBackupRows("inventory_items", clientId),
+          fetchSupabaseBackupRows("item_assignments", clientId),
+        ]);
+        allProducts = productData.rows;
+        categories = categoryData.rows;
+        movements = movementData.rows;
+        inventoryItems = inventoryItemData.rows;
+        assignments = assignmentData.rows;
       }
-      if (!allProducts.length) {
-        showToast(`No hay productos para exportar en ${selectedBusiness.name}.`);
+      if (![allProducts, categories, movements, inventoryItems, assignments].some((rows) => rows.length)) {
+        showToast(`No hay datos de inventario para respaldar en ${selectedBusiness.name}.`);
         return;
       }
-      exportBusinessWorkbook(selectedBusiness, allProducts, movements, categories);
-      showToast(`Respaldo Excel de ${selectedBusiness.name} descargado (${allProducts.length} productos)`);
+      exportBusinessWorkbook(selectedBusiness, { products: allProducts, categories, movements, inventoryItems, assignments });
+      showToast(`Respaldo descargado: ${allProducts.length} productos, ${categories.length} categorías, ${inventoryItems.length} ubicaciones, ${assignments.length} asignaciones y ${movements.length} movimientos.`);
     } catch (error) {
       console.error(error);
       showToast(formatSupabaseError(error, "No pude exportar el archivo Excel de esta empresa"));
