@@ -12,8 +12,8 @@ export default function InventoryFilters({
   onCategoryFilter,
 }) {
   return (
-    <section className={`my-8 grid min-w-0 gap-5 rounded-2xl border p-4 sm:p-5 ${theme.panel}`}>
-      <label className={`flex h-11 w-full min-w-0 items-center gap-3 rounded-lg border px-3 ${theme.input}`}>
+    <section className={`my-7 grid min-w-0 gap-4 rounded-2xl border p-4 shadow-sm sm:gap-5 sm:p-5 ${theme.panel}`}>
+      <label className={`flex h-11 w-full min-w-0 items-center gap-3 rounded-xl border px-3 ${theme.input}`}>
         <Search size={18} aria-hidden="true" />
         <input
           value={query}
@@ -34,7 +34,7 @@ export default function InventoryFilters({
                 type="button"
                 onClick={() => onFilter(value)}
                 aria-pressed={filter === value}
-                className={`flex min-h-11 min-w-0 items-center justify-center rounded-full border px-3 py-2 text-center text-sm font-bold transition hover:border-[color:var(--brand-accent)] ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                className={`flex min-h-11 min-w-0 items-center justify-center rounded-xl border px-3 py-2 text-center text-sm font-semibold transition hover:border-[color:var(--brand-accent)] ${filter === value ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
               >
                 {label}
               </button>
@@ -50,7 +50,7 @@ export default function InventoryFilters({
                 type="button"
                 onClick={() => onCategoryFilter("all")}
                 aria-pressed={categoryFilter === "all"}
-                className={`flex min-h-11 min-w-0 items-center justify-center rounded-full border px-3 py-2 text-center text-sm font-bold transition hover:border-[color:var(--brand-accent)] ${categoryFilter === "all" ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                className={`flex min-h-11 min-w-0 items-center justify-center rounded-xl border px-3 py-2 text-center text-sm font-semibold transition hover:border-[color:var(--brand-accent)] ${categoryFilter === "all" ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
               >
                 Todas
               </button>
@@ -61,7 +61,7 @@ export default function InventoryFilters({
                   onClick={() => onCategoryFilter(categoryFilter === category.key ? "all" : category.key)}
                   aria-pressed={categoryFilter === category.key}
                   title={`${category.label} · ${category.count}`}
-                  className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-3 py-2 text-center text-sm font-bold transition hover:border-[color:var(--brand-accent)] ${categoryFilter === category.key ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
+                  className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-xl border px-3 py-2 text-center text-sm font-semibold transition hover:border-[color:var(--brand-accent)] ${categoryFilter === category.key ? theme.accent : `${theme.panelSoft} ${theme.text}`}`}
                 >
                   <span className="truncate">{category.label}</span>
                   <span className="shrink-0 opacity-75">· {category.count}</span>

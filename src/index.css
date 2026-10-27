@@ -7,10 +7,17 @@
 @layer base {
   :root {
     font-family: Inter, system-ui, sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: #f8fafc;
   }
 
   button,
@@ -18,5 +25,28 @@
   select,
   textarea {
     font: inherit;
+  }
+
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--brand-accent, #64748b);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--brand-soft, #e2e8f0);
+  }
+}
+
+@layer components {
+  .surface-card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .interactive-control {
+    @apply transition-colors duration-150 focus-visible:outline-none;
   }
 }

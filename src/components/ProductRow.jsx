@@ -11,7 +11,7 @@ export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }
     const AssetIcon = getAtainAssetIcon(product.category);
 
     return (
-      <tr className={`border-t ${theme.row}`}>
+      <tr className={`border-t transition-colors hover:bg-black/[0.025] ${theme.row}`}>
         <td className="px-4 py-3 font-extrabold">{product.spot || "Sin spot"}</td>
         <td className="px-4 py-3">
           <Pill className={theme.softAccent}>{product.category || "Activo"}</Pill>
@@ -63,7 +63,7 @@ export default function ProductRow({ product, theme, isAtain, onEdit, onDelete }
   }
 
   return (
-    <tr className={`border-t ${theme.row}`}>
+    <tr className={`border-t transition-colors hover:bg-black/[0.025] ${theme.row}`}>
       <td className="px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           {product.image ? (
