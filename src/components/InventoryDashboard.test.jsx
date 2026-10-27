@@ -28,6 +28,7 @@ function renderDashboard(business) {
       onToggleHistory={vi.fn()}
       onManageAccess={vi.fn()}
       onManageBranding={vi.fn()}
+      onSignOut={vi.fn()}
       onExport={vi.fn()}
     />,
   );
@@ -44,6 +45,13 @@ describe("InventoryDashboard theme surfaces", () => {
     expect(html).toContain("Borrar todo");
     expect(html).toContain('aria-label="Buscar en el inventario"');
     expect(html).toContain('aria-label="Acciones del inventario"');
+    expect(html).toContain('aria-label="Navegación del inventario"');
+    expect(html).toContain('aria-label="Abrir menú"');
+    expect(html).toContain("> Inventario</button>");
+    expect(html).toContain("Tipos de activos");
+    expect(html).toContain("Activos destacados");
+    expect(html).toContain("Usuarios y roles");
+    expect(html).toContain("Personalizar marca");
   });
 
   it("keeps the white header and surfaces used by the light business themes", () => {
@@ -51,6 +59,19 @@ describe("InventoryDashboard theme surfaces", () => {
 
     expect(html).toContain("bg-white border-slate-200 text-stone-950");
     expect(html).toContain("Agregar producto");
+    expect(html).toContain("Productos destacados");
+    expect(html).toContain("Categorías");
+    expect(html).toContain("Productos registrados");
     expect(html).not.toContain("bg-slate-900 border-slate-800");
+  });
+
+  it("keeps dashboards responsive and uses the selected tenant accent on neutral stat cards", () => {
+    const business = businesses.find((item) => item.id === "mara");
+    const html = renderDashboard(business);
+
+    expect(html).toContain("lg:grid-cols-[250px_minmax(0,1fr)]");
+    expect(html).toContain("xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.9fr)]");
+    expect(html).toContain("bg-white border-pink-200");
+    expect(html).toContain("bg-[var(--brand-accent,#475569)]");
   });
 });

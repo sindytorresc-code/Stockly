@@ -90,7 +90,10 @@ export default function CategoryInventoryChart({ products, theme, categoryFilter
                   <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: `color-mix(in srgb, var(--dashboard-accent) ${mix}%, var(--dashboard-surface))` }} />
                   <span className="truncate">{category.label}</span>
                 </span>
-                <span className="text-lg font-extrabold">{category.count}</span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-base font-extrabold leading-tight">{category.count}</span>
+                  <span className={`text-[11px] font-semibold ${theme.muted}`}>{total ? Math.round((category.count / total) * 100) : 0}%</span>
+                </span>
               </button>
             );
           }) : <p className={`sm:col-span-2 rounded-xl border p-5 text-center text-sm ${theme.panelSoft} ${theme.muted}`}>Aún no hay productos con categoría para mostrar.</p>}

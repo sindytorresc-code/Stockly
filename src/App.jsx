@@ -718,6 +718,7 @@ const handleJoinCompany = useCallback(async (companyCode) => {
           onToggleHistory={handleToggleHistory}
           onManageAccess={authRequired ? handleManageAccess : undefined}
           onManageBranding={canManageBranding ? handleOpenBranding : undefined}
+          onSignOut={authRequired ? () => { signOut(); setAuthenticated(false); setSelectedBusiness(null); } : undefined}
         />
       )}
 

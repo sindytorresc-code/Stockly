@@ -41,7 +41,14 @@ export default function AtainAssetPieChart({
   });
 
   return (
-    <section className={`rounded-lg border p-6 ${theme.panel}`}>
+    <section className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${theme.panel}`}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold">Inventario tecnológico</h2>
+          <p className={`mt-1 text-sm ${theme.muted}`}>Distribución de activos por tipo y estado de bodega.</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-extrabold ${theme.softAccent}`}>{scopeTotal} activos</span>
+      </div>
       <div className="mb-5 flex flex-wrap gap-2">
         <button
           type="button"
@@ -109,7 +116,10 @@ export default function AtainAssetPieChart({
                   <span className="size-3 rounded-full" style={{ backgroundColor: segment.color }} />
                   {segment.label}
                 </span>
-                <span className="text-lg font-extrabold">{segment.count}</span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-lg font-extrabold leading-tight">{segment.count}</span>
+                  <span className={`text-[11px] font-semibold ${theme.muted}`}>{total ? Math.round((segment.count / total) * 100) : 0}%</span>
+                </span>
               </button>
             );
           })}

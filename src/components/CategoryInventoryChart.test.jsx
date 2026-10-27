@@ -17,6 +17,8 @@ describe("CategoryInventoryChart", () => {
     expect(markup).toContain("Distribución de 3 productos por categoría");
     expect(markup).toContain("Bebidas");
     expect(markup).toContain("2");
+    expect(markup).toContain("67%");
+    expect(markup).toContain("33%");
     expect(markup).toContain('aria-pressed="true"');
   });
 
