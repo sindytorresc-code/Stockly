@@ -402,6 +402,42 @@ describe("readExcelProducts", () => {
     expect(parseMappedProductImport(draft, draft.mapping).products[0].code).toBe("L-1");
   });
 
+  it("parses Colombian peso prices from Excel and CSV without confusing thousands and decimals", () => {
+    const buffer = workbookBuffer([["Inventario", [
+      ["Nombre", "Código", "Categoría", "Precio", "Stock"],
+      ["Numérico Excel", "P-1", "General", 1099990, 1],
+      ["Formato COP", "P-2", "General", "$1.099.990", 1],
+      ["Miles con coma", "P-3", "General", "$209,000", 1],
+      ["Con decimales", "P-4", "General", "1.099.990,50", 1],
+      ["Formato anglosajón", "P-5", "General", "$2,499,000.00", 1],
+      ["Código COP", "P-6", "General", "COP 150.000", 1],
+    ]]]);
+    const excelResult = readExcelProducts(buffer);
+    expect(excelResult.issues).toEqual([]);
+    expect(excelResult.products.map((product) => product.price)).toEqual([
+      1099990, 1099990, 209000, 1099990.5, 2499000, 150000,
+    ]);
+
+    const csv = "Nombre,Código,Categoría,Precio,Stock\nProducto CSV,C-1,General,$1.099.990,1";
+    const csvResult = readExcelProducts(csv, { fileName: "precios.csv" });
+    expect(csvResult.issues).toEqual([]);
+    expect(csvResult.products[0].price).toBe(1099990);
+  });
+
+  it("keeps rejecting blank, nonnumeric, malformed, and negative sale prices", () => {
+    const buffer = workbookBuffer([["Inventario", [
+      ["Nombre", "Código", "Categoría", "Precio", "Stock"],
+      ["Vacío", "P-1", "General", "", 1],
+      ["Texto", "P-2", "General", "sin precio", 1],
+      ["Miles mal agrupados", "P-3", "General", "1.09.990", 1],
+      ["Negativo", "P-4", "General", "$-1.099.990", 1],
+    ]]]);
+    const result = readExcelProducts(buffer);
+    expect(result.products).toEqual([]);
+    expect(result.issues).toHaveLength(4);
+    expect(result.issues.every((issue) => issue.message.includes("precio de venta inválido"))).toBe(true);
+  });
+
   it("defaults absent optional columns and reports invalid or blank rows", () => {
     const buffer = workbookBuffer([["Inventario", [
       ["Nombre", "SKU", "Precio", "Stock", "Categoría"],

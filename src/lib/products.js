@@ -308,14 +308,51 @@ export function prepareProductImport(input, { fileName = "", businessId = "" } =
 
 function importNumber(value, { integer = false, defaultValue } = {}) {
   if (value === undefined || value === null || String(value).trim() === "") return defaultValue;
-  let text = String(value).trim().replace(/[^\d,.-]/g, "");
-  if (text.includes(",") && text.includes(".")) {
-    text = text.lastIndexOf(",") > text.lastIndexOf(".") ? text.replaceAll(".", "").replace(",", ".") : text.replaceAll(",", "");
-  } else if (text.includes(",")) {
-    text = text.replace(",", ".");
+  let text = String(value).trim()
+    .replace(/^COP\s*/i, "")
+    .replace(/\s*COP$/i, "")
+    .replace(/[\p{Sc}\s]/gu, "");
+  if (!/^-?[\d.,]+$/.test(text)) return NaN;
+
+  const lastComma = text.lastIndexOf(",");
+  const lastDot = text.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimalSeparator = lastComma > lastDot ? "," : ".";
+    const groupingSeparator = decimalSeparator === "," ? "." : ",";
+    const [integerPart, fractionalPart, ...extra] = text.split(decimalSeparator);
+    if (extra.length || !/^\d+$/.test(fractionalPart) || !isValidGroupedInteger(integerPart, groupingSeparator)) return NaN;
+    text = `${integerPart.replaceAll(groupingSeparator, "")}.${fractionalPart}`;
+  } else {
+    const separator = lastComma >= 0 ? "," : lastDot >= 0 ? "." : "";
+    if (separator) {
+      const pieces = text.split(separator);
+      if (pieces.length > 2) {
+        if (!isValidGroupedInteger(text, separator)) return NaN;
+        text = text.replaceAll(separator, "");
+      } else {
+        const [integerPart, fractionalPart] = pieces;
+        if (!fractionalPart) return NaN;
+        // In COP exports, a single separator followed by three digits is the
+        // usual thousands format (e.g. 1.099 or 209,000), not a decimal.
+        if (fractionalPart.length === 3 && integerPart.replace(/^-/, "").length <= 3) {
+          text = `${integerPart}${fractionalPart}`;
+        } else {
+          text = `${integerPart}.${fractionalPart}`;
+        }
+      }
+    }
   }
   const number = Number(text);
   return Number.isFinite(number) && (!integer || Number.isInteger(number)) ? number : NaN;
+}
+
+function isValidGroupedInteger(value, separator) {
+  const signless = value.startsWith("-") ? value.slice(1) : value;
+  if (!signless.includes(separator)) return /^\d+$/.test(signless);
+  const groups = signless.split(separator);
+  return groups.length > 1
+    && /^\d{1,3}$/.test(groups[0])
+    && groups.slice(1).every((group) => /^\d{3}$/.test(group));
 }
 
 export function parseMappedProductImport(draft, mapping) {
