@@ -24,8 +24,20 @@ describe("resolveBusinessTheme", () => {
     expect(theme.brandColor).toBe("#db2777");
     expect(theme.header).toContain("--brand-accent");
     expect(theme.accent).toContain("--brand-accent");
-    expect(theme.panel).toContain("--brand-soft");
+    expect(theme.panel).toContain("bg-white");
+    expect(theme.panel).toContain("--brand-border");
+    expect(theme.softAccent).toContain("--brand-soft");
+    expect(theme.appBg).toBe(genericBusinessTheme.appBg);
     expect(businessThemeStyle(theme)["--brand-accent"]).toBe("#db2777");
+  });
+
+  it("keeps distinct company brand colors on neutral shared surfaces", () => {
+    const pink = resolveBusinessTheme(genericBusinessTheme, { brandColor: "#db2777" });
+    const green = resolveBusinessTheme(genericBusinessTheme, { brandColor: "#15803d" });
+    expect(pink.appBg).toBe(genericBusinessTheme.appBg);
+    expect(green.appBg).toBe(genericBusinessTheme.appBg);
+    expect(pink.panel).toBe(green.panel);
+    expect(businessThemeStyle(pink)["--brand-accent"]).not.toBe(businessThemeStyle(green)["--brand-accent"]);
   });
 
   it("preserves a company's current visual theme until a custom brand color is chosen", () => {

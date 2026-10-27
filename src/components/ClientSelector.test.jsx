@@ -27,6 +27,7 @@ describe("selector de empresas autorizadas", () => {
     const html = renderToStaticMarkup(<ClientSelector businesses={[]} onSelect={() => {}} />);
     expect(html).not.toContain("Mara Makeup");
     expect(html).not.toContain("Empresa sin membresía");
+    expect(html).toContain("Aún no tienes empresas disponibles");
   });
 
   it("conserva las acciones de cerrar sesión y administrar códigos cuando están autorizadas", () => {
@@ -35,5 +36,20 @@ describe("selector de empresas autorizadas", () => {
     );
     expect(html).toContain("Cerrar sesión");
     expect(html).toContain("Administrar llaves de acceso");
+  });
+
+  it("keeps each company's configured brand token scoped to its own card", () => {
+    const html = renderToStaticMarkup(
+      <ClientSelector
+        businesses={[
+          { ...authorizedBusiness, id: "rosa", name: "Rosa", theme: { brandColor: "#db2777" } },
+          { ...authorizedBusiness, id: "verde", name: "Verde", theme: { brandColor: "#15803d" } },
+        ]}
+        onSelect={() => {}}
+      />,
+    );
+    expect(html).toContain("--brand-accent:#db2777");
+    expect(html).toContain("--brand-accent:#15803d");
+    expect(html).not.toContain("focus-visible:outline-none");
   });
 });

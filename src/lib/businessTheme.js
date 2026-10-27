@@ -84,10 +84,13 @@ export function resolveBusinessTheme(defaultTheme = {}, configuredTheme = {}) {
     theme.softAccent = isDark
       ? "bg-[var(--brand-dark-soft)] text-[var(--brand-light-ink)]"
       : "bg-[var(--brand-soft)] text-[var(--brand-accent-ink)]";
-    theme.appBg = isDark ? defaultTheme.appBg : "bg-[var(--brand-soft)]";
-    const panelSurface = isDark ? undefined : "bg-[var(--brand-soft)]";
-    theme.panel = `${panelSurface ? defaultTheme.panel?.replace(/bg-[^ ]+/, panelSurface) : (defaultTheme.panel || "bg-slate-900").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`;
-    theme.panelSoft = `${panelSurface ? defaultTheme.panelSoft?.replace(/bg-[^ ]+/, panelSurface) : (defaultTheme.panelSoft || "bg-slate-800").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`;
+    theme.appBg = defaultTheme.appBg || "bg-stone-100";
+    theme.panel = isDark
+      ? `${(defaultTheme.panel || "bg-slate-900").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`
+      : `${(defaultTheme.panel || "bg-white").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`;
+    theme.panelSoft = isDark
+      ? `${(defaultTheme.panelSoft || "bg-slate-800").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`
+      : `${(defaultTheme.panelSoft || "bg-stone-50").replace(/border-[^ ]+/, "").trim()} border-[color:var(--brand-border)]`;
     theme.input = `${defaultTheme.input?.replace(/border-[^ ]+/, "") || "bg-white text-slate-950"} border-[color:var(--brand-border)] focus:border-[color:var(--brand-accent)]`;
     theme.formBorder = "border-[color:var(--brand-border)] focus:border-[color:var(--brand-accent)] focus:ring-[color:var(--brand-soft)]";
     theme.formAccent = "bg-[var(--brand-accent)] hover:opacity-90 text-[var(--brand-contrast)]";

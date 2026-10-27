@@ -98,51 +98,60 @@ export default function InventoryDashboard({
       <header className={`relative overflow-hidden border-b px-4 py-4 shadow-sm ${headerSurface} ${theme.text}`}>
         <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${theme.accent}`} />
         <div className="mx-auto max-w-[1440px]">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <button type="button" onClick={onBack} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${theme.muted} transition hover:opacity-75`}>
-            <ArrowLeft size={18} /> Volver a clientes
+          <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)] md:items-center xl:grid-cols-[auto_minmax(14rem,auto)_minmax(16rem,1fr)_auto]">
+            <button type="button" onClick={onBack} className={`inline-flex min-h-10 items-center gap-2 justify-self-start rounded-lg px-2 text-sm font-semibold ${theme.muted} transition hover:opacity-75`}>
+              <ArrowLeft size={18} /> <span className="hidden sm:inline">Empresas</span>
             </button>
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${theme.panelSoft} ${theme.muted}`}>
-              <Activity size={14} className="text-[var(--brand-accent,#64748b)]" />
+            <div className="flex min-w-0 items-center gap-3">
+              <span className={`grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border ${theme.panelSoft} ${theme.softAccent}`}>
+                {business.brandConfig?.logoDataUrl ? <img src={business.brandConfig.logoDataUrl} alt={`${business.name} logo`} className="size-full object-contain p-1" /> : <Icon size={22} />}
+              </span>
+              <span className="min-w-0">
+                <span className={`block truncate text-[11px] font-semibold uppercase tracking-[0.14em] ${theme.muted}`}>{business.type}</span>
+                <span className="block truncate text-lg font-bold tracking-tight sm:text-xl">{business.name}</span>
+              </span>
+            </div>
+            <label className={`flex h-11 min-w-0 items-center gap-3 rounded-xl border px-3 ${theme.input} md:col-span-2 xl:col-span-1`}>
+              <Search size={18} aria-hidden="true" className={theme.muted} />
+              <input
+                value={query}
+                onChange={(event) => onQuery(event.target.value)}
+                aria-label="Buscar en el inventario"
+                placeholder={isAtain ? "Buscar spot, serial, campaña o activo…" : "Buscar producto, categoría, código o comentario…"}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-70"
+              />
+            </label>
+            <span className={`inline-flex min-h-10 items-center gap-2 justify-self-start rounded-full border px-3 text-xs font-semibold ${theme.panelSoft} ${theme.muted} md:col-start-2 xl:col-start-auto`}>
+              <Activity size={14} aria-hidden="true" className="text-[var(--brand-accent,#64748b)]" />
               {sourceText}
             </span>
           </div>
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              <span className={`grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border ${theme.panelSoft} ${theme.softAccent}`}>
-                {business.brandConfig?.logoDataUrl ? <img src={business.brandConfig.logoDataUrl} alt={`${business.name} logo`} className="size-full object-contain p-1" /> : <Icon size={23} />}
-              </span>
-              <span className="min-w-0">
-                <span className={`block text-xs font-semibold uppercase tracking-[0.14em] ${theme.muted}`}>{business.type}</span>
-                <span className="block truncate text-2xl font-bold tracking-tight sm:text-3xl">{business.name}</span>
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <label className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>
-                <Upload size={18} /> Cargar archivo
-                <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls" className="hidden" onChange={onImport} />
-              </label>
-              {onExport && <button type="button" onClick={onExport} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>
-                <FileDown size={18} /> Exportar Excel
-              </button>}
-              <button type="button" onClick={onToggleHistory} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Historial</button>
-              {onManageAccess && <button type="button" onClick={onManageAccess} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Usuarios y roles</button>}
-              {onManageBranding && <button type="button" onClick={onManageBranding} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Personalizar marca</button>}
-              {onChangePassword && <button
-                type="button"
-                onClick={onChangePassword}
-                className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}
-              >
-                Cambiar clave
-              </button>}
-              <button
-                type="button"
-                onClick={onAdd}
-                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold shadow-sm transition hover:opacity-90 ${theme.accent}`}
-              >
-                <Plus size={18} /> {isAtain ? "Agregar activo" : "Agregar producto"}
-              </button>
-              {isAtain && (
+          <div role="group" aria-label="Acciones del inventario" className={`mt-4 flex flex-wrap items-center gap-2 border-t pt-4 ${theme.row}`}>
+            <button
+              type="button"
+              onClick={onAdd}
+              className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold shadow-sm transition hover:opacity-90 ${theme.accent}`}
+            >
+              <Plus size={18} /> {isAtain ? "Agregar activo" : "Agregar producto"}
+            </button>
+            <label className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>
+              <Upload size={18} /> Cargar archivo
+              <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xls" className="hidden" onChange={onImport} />
+            </label>
+            {onExport && <button type="button" onClick={onExport} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>
+              <FileDown size={18} /> Exportar Excel
+            </button>}
+            <button type="button" onClick={onToggleHistory} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Historial</button>
+            {onManageAccess && <button type="button" onClick={onManageAccess} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Usuarios y roles</button>}
+            {onManageBranding && <button type="button" onClick={onManageBranding} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}>Personalizar marca</button>}
+            {onChangePassword && <button
+              type="button"
+              onClick={onChangePassword}
+              className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold ${actionSurface} ${theme.text} transition hover:opacity-80`}
+            >
+              Cambiar clave
+            </button>}
+            {isAtain && (
                 <button
                   type="button"
                   onClick={onClearAll}
@@ -151,14 +160,13 @@ export default function InventoryDashboard({
                   <Trash2 size={18} /> Borrar todo
                 </button>
               )}
-            </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8">
         <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard theme={theme} icon={Package} value={stats.total} label="Total general · productos" emphasis />
+          <StatCard theme={theme} icon={Package} value={stats.total} label={isAtain ? "Total general · activos" : "Total general · productos"} emphasis />
           <StatCard theme={theme} icon={DollarSign} value={money.format(stats.value)} label="Valor del inventario" />
           <StatCard theme={theme} icon={TriangleAlert} value={stats.low} label="Stock bajo" warning />
           <StatCard theme={theme} icon={TrendingUp} value={stats.empty} label="Agotados" danger />

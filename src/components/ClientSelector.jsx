@@ -192,6 +192,7 @@ export default function ClientSelector({
         )}
 
         <div className="grid gap-4 text-left sm:grid-cols-2 lg:grid-cols-3">
+          {availableBusinesses.length === 0 && <p className="rounded-2xl border border-dashed border-[var(--stockly-border)] bg-white px-5 py-8 text-center text-sm text-[var(--stockly-muted)] sm:col-span-2 lg:col-span-3">Aún no tienes empresas disponibles. Puedes unirte a una empresa con un código o crear una nueva.</p>}
           {availableBusinesses.map((business) => {
             const Icon = iconMap[business.icon] || iconMap.package;
 
@@ -200,7 +201,7 @@ export default function ClientSelector({
                 key={business.id}
                 type="button"
                 onClick={() => onSelect(business)}
-                className="group overflow-hidden rounded-2xl border border-[var(--stockly-border)] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--brand-accent,#00b4d8)] hover:shadow-md focus-visible:outline-none"
+                className="group overflow-hidden rounded-2xl border border-[var(--stockly-border)] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stockly-brand)] hover:shadow-md"
               >
                 <span className="block p-5" style={businessThemeStyle(business.theme)}>
                   <span className="flex items-start gap-4">

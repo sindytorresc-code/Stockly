@@ -42,6 +42,8 @@ describe("InventoryDashboard theme surfaces", () => {
     expect(html).toContain("ATAIN");
     expect(html).toContain("Agregar activo");
     expect(html).toContain("Borrar todo");
+    expect(html).toContain('aria-label="Buscar en el inventario"');
+    expect(html).toContain('aria-label="Acciones del inventario"');
   });
 
   it("keeps the white header and surfaces used by the light business themes", () => {

@@ -28,7 +28,7 @@ import {
   validateProduct,
 } from "./lib/products.js";
 import { formatSupabaseError } from "./lib/supabaseErrors.js";
-import { businessThemeStyle, genericBusinessTheme, resolveBusinessTheme, themeForBusinessType } from "./lib/businessTheme.js";
+import { businessThemeStyle, genericBusinessTheme, resolveBusinessTheme } from "./lib/businessTheme.js";
 import { businessFromPath, businessPath, clientsPath, navigateToPath } from "./lib/routing.js";
 import { getBusinessPin } from "./lib/storage.js";
 import { consumePendingCompanyDraft, createSupabaseBusiness, fetchSupabaseBackupRows, fetchSupabaseClient, fetchSupabaseClients, hasActiveClientMembership, hasAuthenticatedSession, hasClientPermission, initSupabase, registerCompanyWithGoogle, restoreAuthSession, signOut, joinCompanyWithCode, updateSupabaseBusinessBranding } from "./lib/supabase.js";
@@ -133,8 +133,8 @@ export default function App() {
     const rows = await fetchSupabaseClients();
     const mapped = rows.map((row) => {
       const existing = initialBusinesses.find((item) => item.id === row.slug);
-      const defaultTheme = existing?.theme || themeForBusinessType(row.business_type, initialBusinesses, genericBusinessTheme);
-      const businessTheme = resolveBusinessTheme(defaultTheme, row.theme);
+      const fallbackTheme = existing?.theme?.mode === "dark" ? existing.theme : genericBusinessTheme;
+      const businessTheme = resolveBusinessTheme(fallbackTheme, row.theme);
       return existing ? { ...existing, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || existing.icon, createdAt: row.created_at, cardGradient: businessTheme.header || existing.cardGradient, theme: businessTheme, brandConfig: row.theme || {} } : {
         id: row.slug, clientId: row.id, name: row.name, type: row.business_type, description: row.description || "", icon: row.icon || "package", createdAt: row.created_at,
         cardGradient: businessTheme.header || genericBusinessTheme.header, pin: "", products: [], theme: businessTheme, brandConfig: row.theme || {},
@@ -226,7 +226,7 @@ export default function App() {
     const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (!slug || businesses.some((business) => business.id === slug)) throw new Error("Ya existe una empresa con ese nombre.");
     const brandConfig = { brandColor, logoDataUrl };
-    const theme = resolveBusinessTheme(themeForBusinessType(type, initialBusinesses, genericBusinessTheme), brandConfig);
+    const theme = resolveBusinessTheme(genericBusinessTheme, brandConfig);
     const business = { id: slug, type: type.toLocaleUpperCase(), name, description, icon, brandColor, logoDataUrl, brandConfig, cardGradient: theme.header, pin: "", products: [], theme };
     if (!authRequired) {
       setBusinesses((current) => [...current, business]);
