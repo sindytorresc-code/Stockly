@@ -1,23 +1,23 @@
--- Manual integration test. Run from Supabase SQL Editor with two employee users,
+-- Manual integration test. Run from Supabase SQL Editor with two viewer users,
 -- one company admin, and both production migrations applied.
 -- The transaction is rolled back; it changes no lasting memberships or data.
 begin;
 
 do $$
-declare user_one uuid; user_two uuid; company_one uuid; company_two uuid; employee_role uuid; company_admin uuid; admin_client uuid;
+declare user_one uuid; user_two uuid; company_one uuid; company_two uuid; viewer_role uuid; company_admin uuid; admin_client uuid;
 begin
   select m.user_id,m.client_id into company_admin,admin_client from public.client_memberships m
-    join public.roles r on r.id=m.role_id where m.active and r.name='administrador' order by m.created_at limit 1;
+    join public.roles r on r.id=m.role_id where m.active and r.name='admin' order by m.created_at limit 1;
   select m.user_id into user_one from public.client_memberships m join public.roles r on r.id=m.role_id
-    where m.active and r.name='employee' and m.user_id<>company_admin order by m.created_at,m.user_id limit 1;
+    where m.active and r.name='viewer' and m.user_id<>company_admin order by m.created_at,m.user_id limit 1;
   select m.user_id into user_two from public.client_memberships m join public.roles r on r.id=m.role_id
-    where m.active and r.name='employee' and m.user_id<>user_one and m.user_id<>company_admin order by m.created_at,m.user_id limit 1;
+    where m.active and r.name='viewer' and m.user_id<>user_one and m.user_id<>company_admin order by m.created_at,m.user_id limit 1;
   company_one := admin_client;
   select id into company_two from public.clients where id <> company_one order by created_at, id limit 1;
-  select id into employee_role from public.roles where name='employee';
+  select id into viewer_role from public.roles where name='viewer';
   if user_one is null or user_two is null then raise exception 'test_requires_two_supabase_auth_users'; end if;
   if company_one is null or company_two is null then raise exception 'test_requires_two_companies'; end if;
-  if employee_role is null then raise exception 'employee_role_not_configured'; end if;
+  if viewer_role is null then raise exception 'viewer_role_not_configured'; end if;
   if company_admin is null then raise exception 'test_requires_an_existing_company_admin'; end if;
   perform set_config('stockly.test.user_one', user_one::text, true);
   perform set_config('stockly.test.user_two', user_two::text, true);
@@ -36,7 +36,7 @@ declare created public.clients; one_time_code text;
 begin
   created := public.create_company('stockly-security-probe-'||replace(gen_random_uuid()::text,'-',''),'Security test company','TEST','Rolled-back integration test');
   if not exists(select 1 from public.client_memberships m join public.roles r on r.id=m.role_id
-    where m.client_id=created.id and m.user_id=current_setting('stockly.test.company_admin')::uuid and r.name='administrador' and m.active) then
+    where m.client_id=created.id and m.user_id=current_setting('stockly.test.company_admin')::uuid and r.name='admin' and m.active) then
     raise exception 'company_creator_not_assigned_admin';
   end if;
   if not exists(select 1 from public.clients where id=created.id) then raise exception 'creator_cannot_read_created_company'; end if;
@@ -53,15 +53,15 @@ end $$;
 
 reset role;
 do $$
-declare employee_role uuid;
+declare viewer_role uuid;
 begin
-  select id into employee_role from public.roles where name='employee';
+  select id into viewer_role from public.roles where name='viewer';
   delete from public.client_memberships
     where user_id in (current_setting('stockly.test.user_one')::uuid,current_setting('stockly.test.user_two')::uuid);
   insert into public.client_memberships(client_id,user_id,role_id,active)
-    values(current_setting('stockly.test.company_one')::uuid,current_setting('stockly.test.user_one')::uuid,employee_role,true),
-      (current_setting('stockly.test.company_two')::uuid,current_setting('stockly.test.user_one')::uuid,employee_role,true),
-      (current_setting('stockly.test.company_two')::uuid,current_setting('stockly.test.user_two')::uuid,employee_role,true)
+    values(current_setting('stockly.test.company_one')::uuid,current_setting('stockly.test.user_one')::uuid,viewer_role,true),
+      (current_setting('stockly.test.company_two')::uuid,current_setting('stockly.test.user_one')::uuid,viewer_role,true),
+      (current_setting('stockly.test.company_two')::uuid,current_setting('stockly.test.user_two')::uuid,viewer_role,true)
     on conflict(client_id,user_id) do update set role_id=excluded.role_id,active=true;
   insert into public.company_access_codes(client_id,code_hash)
     values(current_setting('stockly.test.created_company')::uuid,
@@ -92,7 +92,7 @@ begin
   get diagnostics affected = row_count;
   if affected<>0 or not exists(select 1 from public.client_memberships where client_id=current_setting('stockly.test.company_one')::uuid
       and user_id=current_setting('stockly.test.user_one')::uuid and active) then
-    raise exception 'employee_could_revoke_own_membership';
+    raise exception 'viewer_could_revoke_own_membership';
   end if;
   begin
     perform public.join_company_with_code('00000000000000000000000000000000');
@@ -101,20 +101,20 @@ begin
     if sqlerrm='invalid_code_was_accepted' then raise; end if;
     if sqlerrm<>'invalid_company_access_code' then raise; end if;
   end;
-  update public.client_memberships set role_id=(select id from public.roles where name='administrador')
+  update public.client_memberships set role_id=(select id from public.roles where name='admin')
     where client_id=current_setting('stockly.test.company_one')::uuid
       and user_id=current_setting('stockly.test.user_one')::uuid;
   if exists(select 1 from public.client_memberships where client_id=current_setting('stockly.test.company_one')::uuid
-      and user_id=current_setting('stockly.test.user_one')::uuid and role_id=(select id from public.roles where name='administrador')) then
-    raise exception 'employee_promoted_self_to_admin';
+      and user_id=current_setting('stockly.test.user_one')::uuid and role_id=(select id from public.roles where name='admin')) then
+    raise exception 'viewer_promoted_self_to_admin';
   end if;
   if public.join_company_with_code('ABCDEF0123456789ABCDEF0123456789')<>current_setting('stockly.test.created_company')::uuid then
     raise exception 'valid_code_did_not_join_expected_company';
   end if;
   if not exists(select 1 from public.client_memberships m join public.roles r on r.id=m.role_id
     where m.client_id=current_setting('stockly.test.created_company')::uuid
-      and m.user_id=current_setting('stockly.test.user_one')::uuid and r.name='employee' and m.active) then
-    raise exception 'company_join_did_not_assign_employee_role';
+      and m.user_id=current_setting('stockly.test.user_one')::uuid and r.name='viewer' and m.active) then
+    raise exception 'company_join_did_not_assign_viewer_role';
   end if;
 end $$;
 

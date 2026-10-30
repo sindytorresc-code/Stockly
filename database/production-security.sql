@@ -76,7 +76,7 @@ create index if not exists role_permissions_permission_idx on role_permissions(p
 create index if not exists products_client_category_idx on products(client_id,category);
 
 insert into roles(name,description,system_role) values
- ('administrador','Administración completa',true),('manager','Gestión de inventario y usuarios',true),('viewer','Consulta',true)
+ ('admin','Administración completa',true),('manager','Gestión de inventario',true),('viewer','Consulta',true)
 on conflict(name) do nothing;
 insert into permissions(code,description) values
  ('company.read','Consultar empresa'),('company.manage','Administrar empresa'),('inventory.read','Consultar inventario'),
@@ -84,13 +84,11 @@ insert into permissions(code,description) values
 on conflict(code) do nothing;
 insert into role_permissions(role_id,permission_id)
 select r.id,p.id from roles r cross join permissions p
-where lower(btrim(r.name)) = 'administrador' on conflict do nothing;
+where r.name = 'admin' on conflict do nothing;
 insert into role_permissions(role_id,permission_id)
 select r.id,p.id from roles r join permissions p on p.code in ('company.read','inventory.read','inventory.write','movements.read','exports.create') where r.name='manager' on conflict do nothing;
 insert into role_permissions(role_id,permission_id)
 select r.id,p.id from roles r join permissions p on p.code in ('company.read','inventory.read','movements.read','exports.create') where r.name='viewer' on conflict do nothing;
-insert into role_permissions(role_id,permission_id)
-select r.id,p.id from roles r join permissions p on p.code in ('company.read','inventory.read','movements.read','exports.create') where lower(btrim(r.name))='encargado' on conflict do nothing;
 
 create or replace function private.has_client_permission(target_client uuid, permission_code text)
 returns boolean language sql stable security definer set search_path=public as $$
@@ -112,7 +110,7 @@ declare created clients; manager_role uuid;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
   insert into clients(slug,name,business_type,description) values(company_slug,company_name,company_type,company_description) returning * into created;
-  select id into manager_role from roles where name='administrador' and system_role;
+  select id into manager_role from roles where name='admin' and system_role;
   insert into client_memberships(client_id,user_id,role_id) values(created.id,auth.uid(),manager_role);
   return created;
 end $$;

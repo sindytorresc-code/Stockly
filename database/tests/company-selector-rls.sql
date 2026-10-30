@@ -1,5 +1,5 @@
 -- Manual Supabase SQL Editor integration test. It verifies that an active
--- membership with an administrator role can list its company while an
+-- membership with an admin role can list its company while an
 -- unrelated company remains hidden by RLS. All changes are rolled back.
 begin;
 

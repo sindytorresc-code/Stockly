@@ -19,12 +19,12 @@ create policy company_access_codes_no_direct_access on public.company_access_cod
   for all to anon, authenticated using (false) with check (false);
 
 insert into public.roles(name, description, system_role)
-values ('employee', 'Acceso inicial al inventario de la empresa', true)
+values ('viewer', 'Consulta de inventario de la empresa', true)
 on conflict (name) do nothing;
 insert into public.role_permissions(role_id, permission_id)
 select r.id, p.id from public.roles r join public.permissions p
-  on p.code in ('company.read','inventory.read','inventory.write','movements.read','exports.create')
-where r.name='employee'
+  on p.code in ('company.read','inventory.read','movements.read','exports.create')
+where r.name='viewer'
 on conflict do nothing;
 
 -- Creating a new company grants its creator admin privileges only inside that
@@ -44,8 +44,8 @@ begin
   end if;
   insert into public.clients(slug,name,business_type,description)
     values(trim(company_slug),trim(company_name),trim(company_type),coalesce(trim(company_description),'')) returning * into created;
-  select id into admin_role from public.roles where name='administrador' and system_role;
-  if admin_role is null then raise exception 'administrator_role_not_configured'; end if;
+  select id into admin_role from public.roles where name='admin' and system_role;
+  if admin_role is null then raise exception 'admin_role_not_configured'; end if;
   insert into public.client_memberships(client_id,user_id,role_id) values(created.id,auth.uid(),admin_role);
   return created;
 end $$;
@@ -60,7 +60,7 @@ grant execute on function public.create_company(text,text,text,text) to authenti
 
 create or replace function private.join_company_with_code(raw_code text)
 returns uuid language plpgsql security definer set search_path = pg_catalog, public, extensions as $$
-declare caller_id uuid := auth.uid(); matched_client uuid; administrator_role uuid; employee_role uuid; assigned_role uuid; normalized_code text; has_active_membership boolean;
+declare caller_id uuid := auth.uid(); matched_client uuid; administrator_role uuid; viewer_role uuid; assigned_role uuid; normalized_code text; has_active_membership boolean;
 begin
   if caller_id is null then raise exception 'authentication_required'; end if;
   normalized_code := upper(regexp_replace(coalesce(raw_code, ''), '\s', '', 'g'));
@@ -72,13 +72,13 @@ begin
     for key share;
   if matched_client is null then raise exception 'invalid_company_access_code'; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(matched_client::text, 0));
-  select id into administrator_role from public.roles where name='administrador' and system_role;
-  select id into employee_role from public.roles where name='employee' and system_role;
-  if administrator_role is null then raise exception 'administrator_role_not_configured'; end if;
-  if employee_role is null then raise exception 'employee_role_not_configured'; end if;
+  select id into administrator_role from public.roles where name='admin' and system_role;
+  select id into viewer_role from public.roles where name='viewer' and system_role;
+  if administrator_role is null then raise exception 'admin_role_not_configured'; end if;
+  if viewer_role is null then raise exception 'viewer_role_not_configured'; end if;
   select exists(select 1 from public.client_memberships where client_id=matched_client and active)
     into has_active_membership;
-  assigned_role := case when has_active_membership then employee_role else administrator_role end;
+  assigned_role := case when has_active_membership then viewer_role else administrator_role end;
   insert into public.client_memberships(client_id,user_id,role_id,active)
     values (matched_client,caller_id,assigned_role,true)
     on conflict (client_id,user_id) do update

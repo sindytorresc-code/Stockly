@@ -7,6 +7,8 @@ import {
   rotateCompanyAccessCode,
   saveClientMembership,
 } from "../lib/supabase.js";
+import { companyRoleLabel } from "../lib/roles.js";
+import CompanyRoleSelect from "./CompanyRoleSelect.jsx";
 
 export default function AccessManager({ clientId, businessName, onClose }) {
   const [roles, setRoles] = useState([]);
@@ -124,7 +126,7 @@ export default function AccessManager({ clientId, businessName, onClose }) {
           </section>
           <form onSubmit={submit} className="mb-5 grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-[1fr_180px_auto]">
             <label className="text-sm font-bold">ID de usuario<input name="userId" required pattern="[0-9a-fA-F-]{36}" placeholder="UUID de Supabase Auth" className="mt-1 h-10 w-full rounded border px-2 font-normal" /></label>
-            <label className="text-sm font-bold">Rol<select name="roleId" required className="mt-1 h-10 w-full rounded border px-2 font-normal">{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
+            <CompanyRoleSelect roles={roles} />
             <button className="self-end rounded bg-blue-700 px-4 py-2 font-bold text-white">Asignar</button>
           </form>
           <div className="overflow-x-auto">
@@ -134,7 +136,7 @@ export default function AccessManager({ clientId, businessName, onClose }) {
                 <tr key={member.user_id} className="border-t">
                   <td className="p-3">{member.email || "No disponible en el perfil de Supabase"}</td>
                   <td className="p-3 font-mono text-xs">{member.user_id}</td>
-                  <td className="p-3">{roles.find((role) => role.id === member.role_id)?.name || "—"}</td>
+                  <td className="p-3">{companyRoleLabel(roles.find((role) => role.id === member.role_id)?.name)}</td>
                   <td className="p-3">{member.active ? "Activo" : "Desactivado"}</td>
                   <td className="p-3">
                     {member.active ? <button type="button" disabled={Boolean(busyUserId)} onClick={() => setPendingRemoval(member)} className="inline-flex items-center gap-2 rounded border border-red-200 px-3 py-2 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"><UserRoundX size={16} />Retirar</button> : <span className="text-slate-500">Retirado</span>}

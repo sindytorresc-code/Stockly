@@ -569,6 +569,10 @@ export async function fetchAccessConfiguration(clientId) {
 }
 
 export async function saveClientMembership(clientId, userId, roleId) {
+  const roles = await supabaseRequest(`/roles?id=eq.${encodeURIComponent(roleId)}&select=id,name&limit=1`);
+  if (!selectableCompanyRoles(roles || []).some((role) => role.id === roleId)) {
+    throw new Error("Selecciona uno de los roles disponibles: Administrador, Manager o Viewer.");
+  }
   return supabaseRequest("/client_memberships?on_conflict=client_id,user_id", {
     method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({ client_id: clientId, user_id: userId, role_id: roleId, active: true }),

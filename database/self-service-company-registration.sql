@@ -1,5 +1,5 @@
 -- Allow an authenticated Google user to create a new tenant during signup.
--- The caller becomes administrador only in this new tenant; existing memberships,
+-- The caller becomes admin only in this new tenant; existing memberships,
 -- tenant data and RLS policies are unchanged. Never grant this RPC to anon.
 create or replace function private.create_company(company_slug text, company_name text, company_type text, company_description text)
 returns public.clients language plpgsql security definer set search_path=pg_catalog, public as $$
@@ -19,9 +19,9 @@ begin
     values(trim(company_slug),trim(company_name),trim(company_type),coalesce(trim(company_description),''))
     returning * into created;
 
-  select id into admin_role from public.roles where name='administrador' and system_role;
+  select id into admin_role from public.roles where name='admin' and system_role;
   if admin_role is null then
-    raise exception 'administrator_role_not_configured';
+    raise exception 'admin_role_not_configured';
   end if;
   insert into public.client_memberships(client_id,user_id,role_id)
     values(created.id,auth.uid(),admin_role);

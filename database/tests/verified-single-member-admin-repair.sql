@@ -1,5 +1,5 @@
 -- Post-migration assertion for the two companies verified as having exactly
--- one membership, that membership active as employee, and no prior admin.
+-- one membership, that membership active as viewer, and no prior admin.
 do $$
 declare
   target_id uuid;
@@ -18,7 +18,7 @@ begin
     where membership.client_id = target_id and membership.active;
     select count(*) into total_memberships from public.client_memberships where client_id = target_id;
     select count(*) into active_memberships from public.client_memberships where client_id = target_id and active;
-    if role_name <> 'administrador' or total_memberships <> 1 or active_memberships <> 1 then
+    if role_name <> 'admin' or total_memberships <> 1 or active_memberships <> 1 then
       raise exception 'verified_single_member_company_not_admin_%', target_id;
     end if;
   end loop;
